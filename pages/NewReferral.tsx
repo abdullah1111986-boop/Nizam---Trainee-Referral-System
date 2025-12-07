@@ -61,7 +61,8 @@ const NewReferral: React.FC<NewReferralProps> = ({
   const isNew = !initialData;
 
   // Can the current user edit the "Trainer" section?
-  const canEditTrainerSection = isNew && isTrainer;
+  // Updated: Anyone creating a NEW form can edit. Only the owner can edit later (if logic permits, currently locked after create).
+  const canEditTrainerSection = isNew;
 
   const handleCaseTypeChange = (type: CaseType) => {
     if (!canEditTrainerSection) return;
@@ -202,7 +203,7 @@ const NewReferral: React.FC<NewReferralProps> = ({
         {/* Section 1: Trainee Info & Case Details */}
         <div className="mb-8 border-b pb-8">
           <h3 className="text-lg font-bold text-blue-900 mb-4 bg-blue-50 p-2 rounded print:bg-transparent print:p-0 print:border-b print:text-black">
-            1. بيانات المتدرب والحالة (يعبأ من قبل المدرب)
+            1. بيانات المتدرب والحالة (يعبأ من قبل المدرب / المحيل)
           </h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -340,7 +341,7 @@ const NewReferral: React.FC<NewReferralProps> = ({
           
           <div className="mt-4 flex justify-end">
              <div className="text-center">
-                <p className="text-sm text-gray-500 mb-1">توقيع المدرب</p>
+                <p className="text-sm text-gray-500 mb-1">توقيع المدرب / المحيل</p>
                 {(initialData?.trainerSignature || isNew) ? (
                    <div className="border-2 border-green-600 text-green-700 font-bold px-4 py-1 rounded rotate-[-2deg] opacity-80 inline-block">
                      تم الاعتماد إلكترونياً

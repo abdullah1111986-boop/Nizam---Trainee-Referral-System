@@ -27,7 +27,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, currentUse
       icon: <LayoutDashboard size={20} />, 
       visible: currentUserRole === UserRole.HOD || currentUserRole === UserRole.COUNSELOR 
     },
-    { id: 'new-referral', label: 'إحالة جديدة', icon: <FilePlus size={20} />, visible: currentUserRole === UserRole.TRAINER }, 
+    // Updated: Visible to everyone now
+    { id: 'new-referral', label: 'إحالة جديدة', icon: <FilePlus size={20} />, visible: true }, 
     { 
       id: 'referrals', 
       label: getLabelForReferrals(), 
