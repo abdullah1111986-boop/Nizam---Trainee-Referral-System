@@ -1,12 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { CaseType, Repetition } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-
 // Initialize Gemini Client
-// Note: In a real production app, ensure API keys are not exposed on the client side.
-// This is for demonstration using the provided environment variable pattern.
-const ai = new GoogleGenAI({ apiKey });
+// The API key is obtained exclusively from process.env.API_KEY as per guidelines.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeCaseWithGemini = async (
   caseDetails: string,
@@ -14,7 +11,7 @@ export const analyzeCaseWithGemini = async (
   repetition: Repetition,
   previousActions: string
 ): Promise<string> => {
-  if (!apiKey) {
+  if (!process.env.API_KEY) {
     console.warn("Gemini API Key is missing.");
     return "الخدمة الذكية غير متوفرة حالياً (مفتاح API مفقود).";
   }

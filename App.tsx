@@ -7,9 +7,9 @@ import ReferralsList from './pages/ReferralsList';
 import StaffManagement from './pages/StaffManagement';
 import Profile from './pages/Profile';
 import { Referral, Trainee, Staff, UserRole, ReferralStatus } from './types';
-import { UserCircle2, Lock, ChevronDown, Bell, Loader2 } from 'lucide-react';
+import { UserCircle2, Lock, ChevronDown, Bell, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { db } from './services/firebase';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy, enableNetwork, disableNetwork } from 'firebase/firestore';
 
 // Mock Initial Data (Kept for seeding)
 const INITIAL_STAFF: Staff[] = [
@@ -95,44 +95,78 @@ const App: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Connection State
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
   // App Data State
   const [activePage, setActivePage] = useState('dashboard');
-  const [trainees, setTrainees] = useState<Trainee[]>([]); // Trainees are mostly inside referrals now, but kept if needed
+  const [trainees, setTrainees] = useState<Trainee[]>([]); 
   const [staff, setStaff] = useState<Staff[]>([]);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [editingReferral, setEditingReferral] = useState<Referral | undefined>(undefined);
+
+  // Monitor Connection Status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // --- Firebase Synchronization ---
 
   // 1. Sync Staff
   useEffect(() => {
-    const staffRef = collection(db, 'staff');
-    const unsubscribe = onSnapshot(staffRef, async (snapshot) => {
-      if (snapshot.empty) {
-        // Seed Initial Data if empty
-        console.log("Seeding Initial Staff Data...");
-        for (const s of INITIAL_STAFF) {
-          await setDoc(doc(db, 'staff', s.id), s);
+    try {
+      const staffRef = collection(db, 'staff');
+      const unsubscribe = onSnapshot(staffRef, async (snapshot) => {
+        if (snapshot.empty && navigator.onLine) {
+          // Seed Initial Data if empty and online
+          console.log("Seeding Initial Staff Data...");
+          try {
+            for (const s of INITIAL_STAFF) {
+              await setDoc(doc(db, 'staff', s.id), s);
+            }
+          } catch (err) {
+            console.error("Seeding failed:", err);
+          }
+        } else {
+          const staffData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Staff));
+          staffData.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+          setStaff(staffData);
+          setIsLoading(false);
         }
-      } else {
-        const staffData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Staff));
-        // Sort alphabetically by name
-        staffData.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-        setStaff(staffData);
+      }, (error) => {
+        console.error("Staff sync error:", error);
         setIsLoading(false);
-      }
-    });
-    return () => unsubscribe();
+      });
+      return () => unsubscribe();
+    } catch (e) {
+      console.error("Firebase init error (Staff):", e);
+      setIsLoading(false);
+    }
   }, []);
 
   // 2. Sync Referrals
   useEffect(() => {
-    const q = query(collection(db, 'referrals'), orderBy('date', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const referralData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Referral));
-      setReferrals(referralData);
-    });
-    return () => unsubscribe();
+    try {
+      const q = query(collection(db, 'referrals'), orderBy('date', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const referralData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Referral));
+        setReferrals(referralData);
+      }, (error) => {
+        console.error("Referrals sync error:", error);
+      });
+      return () => unsubscribe();
+    } catch (e) {
+      console.error("Firebase init error (Referrals):", e);
+    }
   }, []);
 
   // --- Notification Logic ---
@@ -141,14 +175,12 @@ const App: React.FC = () => {
 
     let filtered: Referral[] = [];
 
-    // HOD Logic: Pending approvals matching specialization
     if (currentUser.role === UserRole.HOD) {
       filtered = referrals.filter(r => 
         (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) &&
         r.specialization === currentUser.specialization
       );
     } 
-    // Counselor Logic: Pending cases assigned to Counselor
     else if (currentUser.isCounselor) {
       filtered = referrals.filter(r => r.status === ReferralStatus.PENDING_COUNSELOR);
     }
@@ -165,14 +197,12 @@ const App: React.FC = () => {
       setLoginError('الرجاء اختيار اسم المستخدم');
       return;
     }
-    // Match by Username (which is the Name) and Password
     const user = staff.find(s => s.username === loginUser && s.password === loginPass);
     if (user) {
       setCurrentUser(user);
       setIsAuthenticated(true);
       setLoginError('');
       
-      // Redirect based on Role
       if (user.role === UserRole.HOD || user.isCounselor) {
         setActivePage('dashboard');
       } else {
@@ -196,7 +226,6 @@ const App: React.FC = () => {
     try {
       const userRef = doc(db, 'staff', currentUser.id);
       await updateDoc(userRef, { password: newPass });
-      // Update local state is automatic via snapshot, but we update current user immediately for UX
       setCurrentUser({ ...currentUser, password: newPass });
     } catch (e) {
       console.error("Error updating password: ", e);
@@ -207,7 +236,6 @@ const App: React.FC = () => {
   // Logic Handlers
   const handleUpdateReferral = async (referral: Referral) => {
     try {
-      // If it has an ID, we assume it might exist, but we use setDoc to be sure (create or overwrite)
       await setDoc(doc(db, 'referrals', referral.id), referral);
       setEditingReferral(undefined);
       setActivePage('referrals');
@@ -232,31 +260,48 @@ const App: React.FC = () => {
     setShowNotifications(false);
   };
 
-  // Staff Management Handlers
-  const handleUpdateStaffList = async (updatedStaffList: Staff[]) => {
-    // Note: The StaffManagement page passes the full list, but with Firestore we usually update individually.
-    // However, to keep the existing component interface compatible, we will detect the added/modified items.
-    // For simplicity in this "StaffManagement" component refactor, we usually just add/update/delete directly there.
-    // We will inject a wrapped setter into the component.
-    // This is handled inside the renderContent switch case below.
+  const addStaffMember = async (newMember: Staff) => {
+    await setDoc(doc(db, 'staff', newMember.id), newMember);
   };
+  
+  const updateStaffMember = async (updatedMember: Staff) => {
+    await setDoc(doc(db, 'staff', updatedMember.id), updatedMember);
+  };
+
+  const deleteStaffMember = async (id: string) => {
+    await deleteDoc(doc(db, 'staff', id));
+  };
+
 
   // Render Login Screen
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center font-cairo p-4">
-        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
-           <div className="text-center mb-8">
-             <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md relative overflow-hidden">
+           {/* Connection Status (Login Screen) */}
+           <div className="absolute top-4 left-4 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-full border border-gray-100 shadow-sm">
+              {isOnline ? (
+                <Wifi size={14} className="text-green-600" />
+              ) : (
+                <WifiOff size={14} className="text-red-500" />
+              )}
+              <span className={`text-[10px] font-bold ${isOnline ? 'text-green-700' : 'text-red-600'}`}>
+                {isOnline ? 'متصل' : 'غير متصل'}
+              </span>
+           </div>
+
+           <div className="text-center mb-8 mt-4">
+             <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-blue-200 shadow-lg">
                <Lock className="text-white" size={32} />
              </div>
              <h1 className="text-xl font-bold text-gray-800">نظام إحالة المتدربين</h1>
-             <p className="text-gray-500 mt-2">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
+             <p className="text-gray-500 mt-2 text-sm">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
            </div>
            
            {isLoading ? (
-             <div className="flex justify-center py-10">
+             <div className="flex flex-col items-center justify-center py-10 gap-2">
                 <Loader2 className="animate-spin text-blue-600" size={32} />
+                <p className="text-xs text-gray-400">جاري الاتصال بقاعدة البيانات...</p>
              </div>
            ) : (
              <form onSubmit={handleLogin} className="space-y-6">
@@ -266,7 +311,7 @@ const App: React.FC = () => {
                    <select
                      value={loginUser}
                      onChange={(e) => setLoginUser(e.target.value)}
-                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white"
+                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white transition-shadow"
                    >
                      <option value="">اختر الاسم من القائمة...</option>
                      {staff.map(s => (
@@ -282,26 +327,26 @@ const App: React.FC = () => {
                    type="password"
                    value={loginPass}
                    onChange={(e) => setLoginPass(e.target.value)}
-                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
                    placeholder="****"
                  />
                </div>
                
                {loginError && (
-                 <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center">
+                 <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center font-medium">
                    {loginError}
                  </div>
                )}
   
-               <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">
+               <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 duration-200">
                  دخول
                </button>
              </form>
            )}
            
-           <div className="mt-8 text-center border-t pt-4">
-             <p className="text-xs text-gray-500">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
-             <p className="text-xs text-blue-500 font-semibold mt-1">تطوير م. عبدالله الزهراني</p>
+           <div className="mt-8 text-center border-t border-dashed pt-4">
+             <p className="text-[10px] text-gray-400 mb-1">الإصدار 1.2.0 - السيرفر: Firebase</p>
+             <p className="text-xs text-blue-500 font-semibold cursor-default">تطوير م. عبدالله الزهراني</p>
            </div>
         </div>
       </div>
@@ -311,38 +356,6 @@ const App: React.FC = () => {
   // Determine Effective Role for UI components
   const effectiveRole = currentUser?.isCounselor ? UserRole.COUNSELOR : (currentUser?.role || UserRole.TRAINER);
 
-  // Wrapper for Staff Management to handle Firestore ops
-  const handleStaffChangeWrapper = async (newStaffList: Staff[]) => {
-    // Determine what changed is complex with a full list replace.
-    // Instead, we will rely on the component calling specific add/update logic if possible, 
-    // but the component is designed to set the whole state.
-    // For this migration, we will map the list changes (naive approach for this specific request context):
-    // Realistically, StaffManagement needs refactoring to call addStaff/deleteStaff props, but keeping constraints in mind:
-    
-    // We will iterate the new list and setDoc for all.
-    // And check for deletions...
-    // To strictly follow the "clean" way, let's inject a custom setter into StaffManagement props that handles DB.
-    // But StaffManagement expects `setStaff: (data: Staff[]) => void`.
-    
-    // We'll leave the StaffManagement component to handle its internal state but we need to intercept the changes.
-    // *Correction*: StaffManagement.tsx logic is simpler to just rewrite the handlers inside App.tsx and pass them, 
-    // OR create a proxy function.
-  };
-
-  const addStaffMember = async (newMember: Staff) => {
-    await setDoc(doc(db, 'staff', newMember.id), newMember);
-  };
-  
-  const updateStaffMember = async (updatedMember: Staff) => {
-    await setDoc(doc(db, 'staff', updatedMember.id), updatedMember);
-  };
-
-  const deleteStaffMember = async (id: string) => {
-    await deleteDoc(doc(db, 'staff', id));
-  };
-
-
-  // Render App Content
   const renderContent = () => {
     if (!currentUser) return null;
 
@@ -378,25 +391,13 @@ const App: React.FC = () => {
           <StaffManagement
             staff={staff}
             setStaff={(newDetails) => {
-               // This is a hacky bridge because we moved to Firestore but kept component prop signature.
-               // Ideally, StaffManagement should emit events like onAdd, onDelete.
-               // We will patch StaffManagement.tsx to handle DB calls directly? 
-               // No, better to pass a modified "setStaff" that detects the change.
-               
-               // Actually, let's just make StaffManagement use a special prop for actions if we could, 
-               // but simpler: The StaffManagement page calls setStaff([...old, new]).
-               // We can detect the diff.
-               
-               // Find added
                newDetails.forEach(n => {
                  if (!staff.find(s => s.id === n.id)) addStaffMember(n);
                });
-               // Find modified
                newDetails.forEach(n => {
                  const old = staff.find(s => s.id === n.id);
                  if (old && JSON.stringify(old) !== JSON.stringify(n)) updateStaffMember(n);
                });
-               // Find deleted
                staff.forEach(s => {
                  if (!newDetails.find(n => n.id === s.id)) deleteStaffMember(s.id);
                });
@@ -431,20 +432,38 @@ const App: React.FC = () => {
       
       <main className="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-8 flex flex-col w-full max-w-full">
         {/* Header */}
-        <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              {activePage === 'dashboard' && 'لوحة المعلومات'}
-              {activePage === 'new-referral' && (editingReferral ? 'متابعة الحالة / التعديل' : 'إحالة جديدة')}
-              {activePage === 'referrals' && 'سجل الإحالات والمتابعة'}
-              {activePage === 'staff' && 'إدارة المدربين'}
-              {activePage === 'profile' && 'إعدادات الحساب'}
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
+        <header className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center justify-between md:block">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-800">
+                {activePage === 'dashboard' && 'لوحة المعلومات'}
+                {activePage === 'new-referral' && (editingReferral ? 'متابعة الحالة / التعديل' : 'إحالة جديدة')}
+                {activePage === 'referrals' && 'سجل الإحالات والمتابعة'}
+                {activePage === 'staff' && 'إدارة المدربين'}
+                {activePage === 'profile' && 'إعدادات الحساب'}
+              </h1>
+              <p className="text-gray-500 text-xs md:text-sm mt-1">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
+            </div>
+            {/* Mobile Connection Status (Small) */}
+            <div className="md:hidden">
+              {isOnline ? (
+                <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm shadow-green-200"></div>
+              ) : (
+                 <div className="w-3 h-3 bg-red-500 rounded-full shadow-sm shadow-red-200 animate-pulse"></div>
+              )}
+            </div>
           </div>
           
-          <div className="flex items-center gap-4 self-end md:self-auto">
+          <div className="flex items-center gap-2 md:gap-4 self-end md:self-auto">
             
+            {/* Desktop Connection Indicator */}
+            <div className="hidden md:flex items-center gap-2 bg-white px-3 py-2 rounded-xl shadow-sm border border-gray-100">
+               {isOnline ? <Wifi size={18} className="text-green-500"/> : <WifiOff size={18} className="text-red-500"/>}
+               <span className={`text-xs font-bold ${isOnline ? 'text-green-700' : 'text-red-600'}`}>
+                 {isOnline ? 'متصل بالسيرفر' : 'غير متصل'}
+               </span>
+            </div>
+
             {/* Notification Bell */}
             <div className="relative z-10">
               <button 
@@ -460,9 +479,10 @@ const App: React.FC = () => {
               </button>
 
               {showNotifications && (
-                <div className="absolute left-0 rtl:left-auto rtl:right-0 md:rtl:left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-20">
-                  <div className="p-3 border-b border-gray-100 font-bold text-gray-700 bg-gray-50">
-                    الإشعارات ({notificationCount})
+                <div className="absolute left-0 rtl:left-auto rtl:right-0 md:rtl:left-0 mt-2 w-72 md:w-80 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-20">
+                  <div className="p-3 border-b border-gray-100 font-bold text-gray-700 bg-gray-50 flex justify-between items-center">
+                    <span>الإشعارات</span>
+                    <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">{notificationCount}</span>
                   </div>
                   <div className="max-h-64 overflow-y-auto">
                     {pendingReferrals.length > 0 ? (
@@ -476,8 +496,10 @@ const App: React.FC = () => {
                             <span className="font-bold text-sm text-gray-800">{referral.traineeName}</span>
                             <span className="text-[10px] text-gray-400">{new Date(referral.date).toLocaleDateString('ar-SA')}</span>
                           </div>
-                          <p className="text-xs text-blue-600 font-medium truncate">{referral.status}</p>
-                          <p className="text-xs text-gray-500 truncate">{referral.caseTypes.join(', ')}</p>
+                          <div className="flex justify-between items-center">
+                             <p className="text-xs text-blue-600 font-medium truncate">{referral.status}</p>
+                             {referral.repetition === 'دائم التكرار' && <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">متكرر</span>}
+                          </div>
                         </div>
                       ))
                     ) : (
