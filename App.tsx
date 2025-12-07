@@ -279,13 +279,13 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center font-cairo p-4">
         <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md relative overflow-hidden">
            {/* Connection Status (Login Screen) */}
-           <div className="absolute top-4 left-4 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-full border border-gray-100 shadow-sm">
+           <div className="absolute top-4 left-4 flex items-center gap-1 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
               {isOnline ? (
-                <Wifi size={14} className="text-green-600" />
+                <Wifi size={16} className="text-green-600" />
               ) : (
-                <WifiOff size={14} className="text-red-500" />
+                <WifiOff size={16} className="text-red-500" />
               )}
-              <span className={`text-[10px] font-bold ${isOnline ? 'text-green-700' : 'text-red-600'}`}>
+              <span className={`text-xs font-bold ${isOnline ? 'text-green-700' : 'text-red-600'}`}>
                 {isOnline ? 'متصل' : 'غير متصل'}
               </span>
            </div>
@@ -345,7 +345,7 @@ const App: React.FC = () => {
            )}
            
            <div className="mt-8 text-center border-t border-dashed pt-4">
-             <p className="text-[10px] text-gray-400 mb-1">الإصدار 1.2.0 - السيرفر: Firebase</p>
+             <p className="text-[10px] text-gray-400 mb-1">الإصدار 1.2.1 - السيرفر: Firebase</p>
              <p className="text-xs text-blue-500 font-semibold cursor-default">تطوير م. عبدالله الزهراني</p>
            </div>
         </div>
@@ -444,13 +444,13 @@ const App: React.FC = () => {
               </h1>
               <p className="text-gray-500 text-xs md:text-sm mt-1">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
             </div>
-            {/* Mobile Connection Status (Small) */}
-            <div className="md:hidden">
-              {isOnline ? (
-                <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm shadow-green-200"></div>
-              ) : (
-                 <div className="w-3 h-3 bg-red-500 rounded-full shadow-sm shadow-red-200 animate-pulse"></div>
-              )}
+            {/* Mobile Connection Status (Explicit Icon) */}
+            <div className="md:hidden flex items-center bg-white px-2 py-1 rounded-full shadow-sm border border-gray-100">
+               {isOnline ? (
+                 <Wifi size={16} className="text-green-600" />
+               ) : (
+                 <WifiOff size={16} className="text-red-500 animate-pulse" />
+               )}
             </div>
           </div>
           

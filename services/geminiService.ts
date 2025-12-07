@@ -2,8 +2,10 @@ import { GoogleGenAI } from "@google/genai";
 import { CaseType, Repetition } from "../types";
 
 // Initialize Gemini Client
-// The API key is obtained exclusively from process.env.API_KEY as per guidelines.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Securely access API Key, preventing crash in Vite/Browser environments where 'process' is undefined.
+const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : '';
+
+const ai = new GoogleGenAI({ apiKey: apiKey });
 
 export const analyzeCaseWithGemini = async (
   caseDetails: string,
@@ -11,7 +13,7 @@ export const analyzeCaseWithGemini = async (
   repetition: Repetition,
   previousActions: string
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
+  if (!apiKey) {
     console.warn("Gemini API Key is missing.");
     return "الخدمة الذكية غير متوفرة حالياً (مفتاح API مفقود).";
   }
