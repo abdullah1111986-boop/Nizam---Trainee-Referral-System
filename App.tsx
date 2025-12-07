@@ -512,7 +512,10 @@ const App: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100 px-3">
+            <div 
+              className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100 px-3 cursor-pointer hover:bg-gray-50 transition"
+              onClick={() => setActivePage('profile')}
+            >
               <UserCircle2 className="text-blue-600" />
               <div className="text-sm hidden md:block">
                 <p className="font-bold text-gray-800">{currentUser?.name}</p>
@@ -536,6 +539,7 @@ const App: React.FC = () => {
         }} 
         currentUserRole={effectiveRole}
         notificationCount={notificationCount}
+        onLogout={handleLogout}
       />
     </div>
   );
