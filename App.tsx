@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import MobileNav from './components/MobileNav';
@@ -8,11 +7,11 @@ import ReferralsList from './pages/ReferralsList';
 import StaffManagement from './pages/StaffManagement';
 import Profile from './pages/Profile';
 import { Referral, Trainee, Staff, UserRole, ReferralStatus } from './types';
-import { UserCircle2, Lock, ChevronDown, Bell } from 'lucide-react';
+import { UserCircle2, Lock, ChevronDown, Bell, Loader2 } from 'lucide-react';
+import { db } from './services/firebase';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
-// Mock Initial Data (Kept for structure, though manual entry is used now)
-const MOCK_TRAINEES: Trainee[] = [];
-
+// Mock Initial Data (Kept for seeding)
 const INITIAL_STAFF: Staff[] = [
   // Heads of Department
   { 
@@ -94,38 +93,47 @@ const App: React.FC = () => {
 
   // Notification UI State
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // App Data State
   const [activePage, setActivePage] = useState('dashboard');
-  const [trainees, setTrainees] = useState<Trainee[]>(() => {
-    const saved = localStorage.getItem('trainees');
-    return saved ? JSON.parse(saved) : MOCK_TRAINEES;
-  });
-  
-  const [staff, setStaff] = useState<Staff[]>(() => {
-    const saved = localStorage.getItem('staff');
-    return saved ? JSON.parse(saved) : INITIAL_STAFF;
-  });
-
-  const [referrals, setReferrals] = useState<Referral[]>(() => {
-    const saved = localStorage.getItem('referrals');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
+  const [trainees, setTrainees] = useState<Trainee[]>([]); // Trainees are mostly inside referrals now, but kept if needed
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [referrals, setReferrals] = useState<Referral[]>([]);
   const [editingReferral, setEditingReferral] = useState<Referral | undefined>(undefined);
 
-  // Persistence
-  useEffect(() => {
-    localStorage.setItem('trainees', JSON.stringify(trainees));
-  }, [trainees]);
+  // --- Firebase Synchronization ---
 
+  // 1. Sync Staff
   useEffect(() => {
-    localStorage.setItem('referrals', JSON.stringify(referrals));
-  }, [referrals]);
+    const staffRef = collection(db, 'staff');
+    const unsubscribe = onSnapshot(staffRef, async (snapshot) => {
+      if (snapshot.empty) {
+        // Seed Initial Data if empty
+        console.log("Seeding Initial Staff Data...");
+        for (const s of INITIAL_STAFF) {
+          await setDoc(doc(db, 'staff', s.id), s);
+        }
+      } else {
+        const staffData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Staff));
+        // Sort alphabetically by name
+        staffData.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+        setStaff(staffData);
+        setIsLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
+  // 2. Sync Referrals
   useEffect(() => {
-    localStorage.setItem('staff', JSON.stringify(staff));
-  }, [staff]);
+    const q = query(collection(db, 'referrals'), orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const referralData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Referral));
+      setReferrals(referralData);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // --- Notification Logic ---
   const pendingReferrals = useMemo(() => {
@@ -144,10 +152,8 @@ const App: React.FC = () => {
     else if (currentUser.isCounselor) {
       filtered = referrals.filter(r => r.status === ReferralStatus.PENDING_COUNSELOR);
     }
-    // Trainer Logic: Optional - maybe show cases returned to them? 
-    // For now, let's keep it clean: no "Action Required" for trainer unless explicitly requested.
     
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return filtered;
   }, [referrals, currentUser]);
 
   const notificationCount = pendingReferrals.length;
@@ -172,7 +178,6 @@ const App: React.FC = () => {
       } else {
         setActivePage('new-referral');
       }
-
     } else {
       setLoginError('كلمة المرور غير صحيحة');
     }
@@ -186,37 +191,61 @@ const App: React.FC = () => {
     setShowNotifications(false);
   };
 
-  const handleUpdatePassword = (newPass: string) => {
+  const handleUpdatePassword = async (newPass: string) => {
     if (!currentUser) return;
-    const updatedUser = { ...currentUser, password: newPass };
-    const updatedStaff = staff.map(s => s.id === currentUser.id ? updatedUser : s);
-    setStaff(updatedStaff);
-    setCurrentUser(updatedUser);
+    try {
+      const userRef = doc(db, 'staff', currentUser.id);
+      await updateDoc(userRef, { password: newPass });
+      // Update local state is automatic via snapshot, but we update current user immediately for UX
+      setCurrentUser({ ...currentUser, password: newPass });
+    } catch (e) {
+      console.error("Error updating password: ", e);
+      alert('حدث خطأ أثناء تحديث كلمة المرور');
+    }
   };
 
   // Logic Handlers
-  const handleUpdateReferral = (referral: Referral) => {
-    const exists = referrals.some(r => r.id === referral.id);
-    if (exists) {
-      setReferrals(prev => prev.map(r => r.id === referral.id ? referral : r));
-    } else {
-      setReferrals(prev => [referral, ...prev]);
+  const handleUpdateReferral = async (referral: Referral) => {
+    try {
+      // If it has an ID, we assume it might exist, but we use setDoc to be sure (create or overwrite)
+      await setDoc(doc(db, 'referrals', referral.id), referral);
+      setEditingReferral(undefined);
+      setActivePage('referrals');
+    } catch (e) {
+      console.error("Error saving referral: ", e);
+      alert("حدث خطأ أثناء حفظ الإحالة. الرجاء التحقق من الاتصال.");
     }
-    setEditingReferral(undefined);
-    setActivePage('referrals');
   };
+
+  const handleDeleteReferral = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'referrals', id));
+    } catch (e) {
+      console.error("Error deleting referral", e);
+      alert("حدث خطأ أثناء الحذف");
+    }
+  }
 
   const handleEditReferral = (referral: Referral) => {
     setEditingReferral(referral);
     setActivePage('new-referral');
-    setShowNotifications(false); // Close dropdown if open
+    setShowNotifications(false);
+  };
+
+  // Staff Management Handlers
+  const handleUpdateStaffList = async (updatedStaffList: Staff[]) => {
+    // Note: The StaffManagement page passes the full list, but with Firestore we usually update individually.
+    // However, to keep the existing component interface compatible, we will detect the added/modified items.
+    // For simplicity in this "StaffManagement" component refactor, we usually just add/update/delete directly there.
+    // We will inject a wrapped setter into the component.
+    // This is handled inside the renderContent switch case below.
   };
 
   // Render Login Screen
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center font-cairo p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
            <div className="text-center mb-8">
              <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                <Lock className="text-white" size={32} />
@@ -225,44 +254,50 @@ const App: React.FC = () => {
              <p className="text-gray-500 mt-2">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
            </div>
            
-           <form onSubmit={handleLogin} className="space-y-6">
-             <div>
-               <label className="block text-sm font-bold text-gray-700 mb-2">اسم المستخدم</label>
-               <div className="relative">
-                 <select
-                   value={loginUser}
-                   onChange={(e) => setLoginUser(e.target.value)}
-                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white"
-                 >
-                   <option value="">اختر الاسم من القائمة...</option>
-                   {staff.map(s => (
-                     <option key={s.id} value={s.username}>{s.name} ({s.role === UserRole.HOD ? 'رئيس قسم' : (s.isCounselor ? 'مرشد تدريبي' : 'مدرب')})</option>
-                   ))}
-                 </select>
-                 <ChevronDown className="absolute left-3 top-3.5 text-gray-400 pointer-events-none" size={20} />
-               </div>
+           {isLoading ? (
+             <div className="flex justify-center py-10">
+                <Loader2 className="animate-spin text-blue-600" size={32} />
              </div>
-             <div>
-               <label className="block text-sm font-bold text-gray-700 mb-2">كلمة المرور</label>
-               <input
-                 type="password"
-                 value={loginPass}
-                 onChange={(e) => setLoginPass(e.target.value)}
-                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                 placeholder="****"
-               />
-             </div>
-             
-             {loginError && (
-               <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center">
-                 {loginError}
+           ) : (
+             <form onSubmit={handleLogin} className="space-y-6">
+               <div>
+                 <label className="block text-sm font-bold text-gray-700 mb-2">اسم المستخدم</label>
+                 <div className="relative">
+                   <select
+                     value={loginUser}
+                     onChange={(e) => setLoginUser(e.target.value)}
+                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white"
+                   >
+                     <option value="">اختر الاسم من القائمة...</option>
+                     {staff.map(s => (
+                       <option key={s.id} value={s.username}>{s.name} ({s.role === UserRole.HOD ? 'رئيس قسم' : (s.isCounselor ? 'مرشد تدريبي' : 'مدرب')})</option>
+                     ))}
+                   </select>
+                   <ChevronDown className="absolute left-3 top-3.5 text-gray-400 pointer-events-none" size={20} />
+                 </div>
                </div>
-             )}
-
-             <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">
-               دخول
-             </button>
-           </form>
+               <div>
+                 <label className="block text-sm font-bold text-gray-700 mb-2">كلمة المرور</label>
+                 <input
+                   type="password"
+                   value={loginPass}
+                   onChange={(e) => setLoginPass(e.target.value)}
+                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                   placeholder="****"
+                 />
+               </div>
+               
+               {loginError && (
+                 <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center">
+                   {loginError}
+                 </div>
+               )}
+  
+               <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">
+                 دخول
+               </button>
+             </form>
+           )}
            
            <div className="mt-8 text-center border-t pt-4">
              <p className="text-xs text-gray-500">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
@@ -275,6 +310,37 @@ const App: React.FC = () => {
 
   // Determine Effective Role for UI components
   const effectiveRole = currentUser?.isCounselor ? UserRole.COUNSELOR : (currentUser?.role || UserRole.TRAINER);
+
+  // Wrapper for Staff Management to handle Firestore ops
+  const handleStaffChangeWrapper = async (newStaffList: Staff[]) => {
+    // Determine what changed is complex with a full list replace.
+    // Instead, we will rely on the component calling specific add/update logic if possible, 
+    // but the component is designed to set the whole state.
+    // For this migration, we will map the list changes (naive approach for this specific request context):
+    // Realistically, StaffManagement needs refactoring to call addStaff/deleteStaff props, but keeping constraints in mind:
+    
+    // We will iterate the new list and setDoc for all.
+    // And check for deletions...
+    // To strictly follow the "clean" way, let's inject a custom setter into StaffManagement props that handles DB.
+    // But StaffManagement expects `setStaff: (data: Staff[]) => void`.
+    
+    // We'll leave the StaffManagement component to handle its internal state but we need to intercept the changes.
+    // *Correction*: StaffManagement.tsx logic is simpler to just rewrite the handlers inside App.tsx and pass them, 
+    // OR create a proxy function.
+  };
+
+  const addStaffMember = async (newMember: Staff) => {
+    await setDoc(doc(db, 'staff', newMember.id), newMember);
+  };
+  
+  const updateStaffMember = async (updatedMember: Staff) => {
+    await setDoc(doc(db, 'staff', updatedMember.id), updatedMember);
+  };
+
+  const deleteStaffMember = async (id: string) => {
+    await deleteDoc(doc(db, 'staff', id));
+  };
+
 
   // Render App Content
   const renderContent = () => {
@@ -303,6 +369,7 @@ const App: React.FC = () => {
             referrals={referrals} 
             onEdit={handleEditReferral} 
             currentUser={currentUser}
+            onDelete={handleDeleteReferral}
           />
         );
       case 'staff':
@@ -310,7 +377,30 @@ const App: React.FC = () => {
         return (
           <StaffManagement
             staff={staff}
-            setStaff={setStaff}
+            setStaff={(newDetails) => {
+               // This is a hacky bridge because we moved to Firestore but kept component prop signature.
+               // Ideally, StaffManagement should emit events like onAdd, onDelete.
+               // We will patch StaffManagement.tsx to handle DB calls directly? 
+               // No, better to pass a modified "setStaff" that detects the change.
+               
+               // Actually, let's just make StaffManagement use a special prop for actions if we could, 
+               // but simpler: The StaffManagement page calls setStaff([...old, new]).
+               // We can detect the diff.
+               
+               // Find added
+               newDetails.forEach(n => {
+                 if (!staff.find(s => s.id === n.id)) addStaffMember(n);
+               });
+               // Find modified
+               newDetails.forEach(n => {
+                 const old = staff.find(s => s.id === n.id);
+                 if (old && JSON.stringify(old) !== JSON.stringify(n)) updateStaffMember(n);
+               });
+               // Find deleted
+               staff.forEach(s => {
+                 if (!newDetails.find(n => n.id === s.id)) deleteStaffMember(s.id);
+               });
+            }}
             currentUserSpecialization={currentUser.specialization}
           />
         );
@@ -339,7 +429,7 @@ const App: React.FC = () => {
         notificationCount={notificationCount}
       />
       
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-8 flex flex-col">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-8 flex flex-col w-full max-w-full">
         {/* Header */}
         <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -353,7 +443,7 @@ const App: React.FC = () => {
             <p className="text-gray-500 text-sm mt-1">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 self-end md:self-auto">
             
             {/* Notification Bell */}
             <div className="relative z-10">
@@ -370,7 +460,7 @@ const App: React.FC = () => {
               </button>
 
               {showNotifications && (
-                <div className="absolute left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                <div className="absolute left-0 rtl:left-auto rtl:right-0 md:rtl:left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-20">
                   <div className="p-3 border-b border-gray-100 font-bold text-gray-700 bg-gray-50">
                     الإشعارات ({notificationCount})
                   </div>
@@ -402,7 +492,7 @@ const App: React.FC = () => {
 
             <div className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100 px-3">
               <UserCircle2 className="text-blue-600" />
-              <div className="text-sm">
+              <div className="text-sm hidden md:block">
                 <p className="font-bold text-gray-800">{currentUser?.name}</p>
                 <p className="text-xs text-gray-500">
                   {currentUser?.role === UserRole.HOD ? `رئيس قسم - ${currentUser.specialization}` : currentUser?.role}

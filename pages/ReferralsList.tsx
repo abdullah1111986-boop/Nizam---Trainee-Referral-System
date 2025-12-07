@@ -1,14 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { Referral, ReferralStatus, UserRole, Staff } from '../types';
-import { Search, Edit, FileText, Printer, AlertOctagon } from 'lucide-react';
+import { Search, Edit, FileText, Printer, AlertOctagon, Trash2 } from 'lucide-react';
 
 interface ReferralsListProps {
   referrals: Referral[];
   onEdit: (referral: Referral) => void;
   currentUser: Staff;
+  onDelete: (id: string) => void;
 }
 
-const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, currentUser }) => {
+const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, currentUser, onDelete }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -61,10 +62,25 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
     window.print();
   };
 
+  const handleDeleteClick = (referral: Referral) => {
+    // Permission Check
+    const isHoD = currentUser.role === UserRole.HOD;
+    const isOwner = referral.trainerId === currentUser.id;
+    
+    if (!isHoD && !isOwner) {
+      alert("ليس لديك صلاحية لحذف هذا السجل.");
+      return;
+    }
+
+    if (window.confirm(`هل أنت متأكد من حذف إحالة المتدرب: ${referral.traineeName}؟ لا يمكن التراجع عن هذا الإجراء.`)) {
+      onDelete(referral.id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100 no-print gap-4">
-        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 w-full md:w-auto">
           {currentUser.isCounselor ? 'مهام الإرشاد وحالاتي' : 'سجل الإحالات'}
         </h2>
         
@@ -72,7 +88,7 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
            <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full md:w-auto"
           >
             <option value="all">جميع الحالات</option>
             <option value={ReferralStatus.PENDING_HOD}>بانتظار رئيس القسم</option>
@@ -81,7 +97,7 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
             <option value={ReferralStatus.RESOLVED}>مكتملة</option>
           </select>
 
-          <div className="relative flex-1 md:w-64">
+          <div className="relative flex-1 md:w-64 w-full">
             <Search className="absolute right-3 top-2.5 text-gray-400" size={18} />
             <input
               type="text"
@@ -92,7 +108,7 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
             />
           </div>
           
-          <button onClick={handlePrint} className="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 flex items-center justify-center gap-2">
+          <button onClick={handlePrint} className="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 flex items-center justify-center gap-2 w-full md:w-auto">
             <Printer size={18} />
           </button>
         </div>
@@ -115,14 +131,14 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:border-0 print:shadow-none">
         <div className="overflow-x-auto">
-          <table className="w-full text-right">
+          <table className="w-full text-right min-w-[800px] md:min-w-0">
             <thead className="bg-gray-50 border-b border-gray-200 print:bg-gray-100">
               <tr>
                 <th className="p-4 text-sm font-semibold text-gray-600">المتدرب</th>
                 <th className="p-4 text-sm font-semibold text-gray-600">الرقم التدريبي</th>
-                <th className="p-4 text-sm font-semibold text-gray-600">القسم</th>
+                <th className="p-4 text-sm font-semibold text-gray-600 hidden md:table-cell">القسم</th>
                 <th className="p-4 text-sm font-semibold text-gray-600">التاريخ</th>
-                <th className="p-4 text-sm font-semibold text-gray-600">نوع الحالة</th>
+                <th className="p-4 text-sm font-semibold text-gray-600 hidden sm:table-cell">نوع الحالة</th>
                 <th className="p-4 text-sm font-semibold text-gray-600">الحالة</th>
                 <th className="p-4 text-sm font-semibold text-gray-600 no-print">إجراءات</th>
               </tr>
@@ -142,9 +158,9 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
                     </div>
                   </td>
                   <td className="p-4 text-gray-600 font-mono text-sm">{referral.trainingNumber}</td>
-                   <td className="p-4 text-gray-600 text-sm">{referral.specialization}</td>
+                   <td className="p-4 text-gray-600 text-sm hidden md:table-cell">{referral.specialization}</td>
                   <td className="p-4 text-gray-600 text-sm">{new Date(referral.date).toLocaleDateString('ar-SA')}</td>
-                  <td className="p-4 text-gray-600 text-sm max-w-xs truncate">
+                  <td className="p-4 text-gray-600 text-sm max-w-xs truncate hidden sm:table-cell">
                     {referral.caseTypes.join(', ')}
                   </td>
                   <td className="p-4">
@@ -160,13 +176,25 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
                       {referral.status}
                     </span>
                   </td>
-                  <td className="p-4 no-print">
+                  <td className="p-4 no-print flex items-center gap-2">
                     <button 
                       onClick={() => onEdit(referral)}
                       className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition"
+                      title="عرض / تعديل"
                     >
                       <Edit size={18} />
                     </button>
+                    
+                    {/* Delete Button - Only for HoD or Owner */}
+                    {(currentUser.role === UserRole.HOD || referral.trainerId === currentUser.id) && (
+                      <button 
+                        onClick={() => handleDeleteClick(referral)}
+                        className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition"
+                        title="حذف السجل"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

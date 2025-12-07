@@ -177,11 +177,11 @@ const NewReferral: React.FC<NewReferralProps> = ({
   );
 
   return (
-    <div className="max-w-4xl mx-auto pb-20">
+    <div className="max-w-4xl mx-auto pb-20 md:pb-8">
       
       {/* Action Bar (Top) - Hidden in Print */}
-      <div className="flex items-center justify-between mb-6 no-print">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col md:flex-row items-center justify-between mb-6 no-print gap-4">
+        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
            <button onClick={onCancel} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2">
             <ArrowLeft size={18} /> عودة
           </button>
@@ -189,13 +189,13 @@ const NewReferral: React.FC<NewReferralProps> = ({
             <Printer size={18} /> طباعة / PDF
           </button>
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-gray-500 w-full md:w-auto text-right md:text-left">
           الحالة الحالية: <span className="font-bold text-blue-600">{initialData ? initialData.status : 'مسودة'}</span>
         </div>
       </div>
 
       {/* Main Form Content */}
-      <div ref={formRef} className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 print:shadow-none print:border-0">
+      <div ref={formRef} className="bg-white p-4 md:p-8 rounded-xl shadow-sm border border-gray-100 print:shadow-none print:border-0">
         
         <PrintHeader />
 
@@ -273,7 +273,7 @@ const NewReferral: React.FC<NewReferralProps> = ({
 
           <div className="mb-6">
             <label className="block text-sm font-bold text-gray-700 mb-2">نوع الحالة:</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {Object.values(CaseType).map((type) => (
                 <label key={type} className="flex items-center space-x-2 space-x-reverse">
                   <input
@@ -289,10 +289,10 @@ const NewReferral: React.FC<NewReferralProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
                <label className="block text-sm font-bold text-gray-700 mb-2">تكرار المشكلة:</label>
-               <div className="flex gap-4">
+               <div className="flex flex-col sm:flex-row gap-4">
                  {Object.values(Repetition).map((rep) => (
                    <label key={rep} className="flex items-center space-x-2 space-x-reverse">
                      <input
@@ -320,7 +320,7 @@ const NewReferral: React.FC<NewReferralProps> = ({
                     placeholder="وصف تفصيلي للمشكلة..."
                   />
                 ) : (
-                  <p className="p-3 bg-gray-50 rounded border border-gray-200 text-gray-900 min-h-[3rem]">{caseDetails}</p>
+                  <p className="p-3 bg-gray-50 rounded border border-gray-200 text-gray-900 min-h-[3rem] whitespace-pre-line">{caseDetails}</p>
                 )}
              </div>
              <div>
@@ -333,7 +333,7 @@ const NewReferral: React.FC<NewReferralProps> = ({
                     placeholder="الإجراءات المتخذة..."
                   />
                 ) : (
-                   <p className="p-3 bg-gray-50 rounded border border-gray-200 text-gray-900 min-h-[3rem]">{previousActions || 'لا يوجد'}</p>
+                   <p className="p-3 bg-gray-50 rounded border border-gray-200 text-gray-900 min-h-[3rem] whitespace-pre-line">{previousActions || 'لا يوجد'}</p>
                 )}
              </div>
           </div>
@@ -355,7 +355,7 @@ const NewReferral: React.FC<NewReferralProps> = ({
           <div className="mt-6 text-center no-print">
             <button
               onClick={handleSubmitNew}
-              className="bg-blue-600 text-white py-3 px-8 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg flex items-center gap-2 mx-auto"
+              className="bg-blue-600 text-white py-3 px-8 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg flex items-center gap-2 mx-auto w-full md:w-auto justify-center"
             >
               <Send size={20} /> رفع الإحالة لرئيس القسم
             </button>
@@ -397,14 +397,14 @@ const NewReferral: React.FC<NewReferralProps> = ({
                 />
               </div>
 
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col md:flex-row flex-wrap gap-4">
                 {/* HoD Actions */}
                 {isHoD && initialData.status === ReferralStatus.PENDING_HOD && (
                   <>
-                    <button onClick={() => handleAction(ReferralStatus.RESOLVED, 'تم حل المشكلة من قبل رئيس القسم', 'hod')} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2">
+                    <button onClick={() => handleAction(ReferralStatus.RESOLVED, 'تم حل المشكلة من قبل رئيس القسم', 'hod')} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 flex-1">
                       <CheckCircle size={18} /> حل وإغلاق
                     </button>
-                    <button onClick={() => handleAction(ReferralStatus.PENDING_COUNSELOR, 'تحويل للمرشد التدريبي', 'hod')} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                    <button onClick={() => handleAction(ReferralStatus.PENDING_COUNSELOR, 'تحويل للمرشد التدريبي', 'hod')} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 flex-1">
                       <ArrowLeft size={18} /> تحويل للمرشد
                     </button>
                   </>
@@ -412,10 +412,10 @@ const NewReferral: React.FC<NewReferralProps> = ({
                 
                 {isHoD && initialData.status === ReferralStatus.RETURNED_TO_HOD && (
                   <>
-                    <button onClick={() => handleAction(ReferralStatus.RESOLVED, 'اعتماد الحل وإغلاق', 'hod')} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2">
+                    <button onClick={() => handleAction(ReferralStatus.RESOLVED, 'اعتماد الحل وإغلاق', 'hod')} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 flex-1">
                       <CheckCircle size={18} /> اعتماد الحل وإغلاق
                     </button>
-                    <button onClick={() => handleAction(ReferralStatus.TO_STUDENT_AFFAIRS, 'تحويل لشؤون المتدربين', 'hod')} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2">
+                    <button onClick={() => handleAction(ReferralStatus.TO_STUDENT_AFFAIRS, 'تحويل لشؤون المتدربين', 'hod')} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 flex-1">
                       <AlertTriangle size={18} /> رفع لشؤون المتدربين
                     </button>
                   </>
@@ -424,10 +424,10 @@ const NewReferral: React.FC<NewReferralProps> = ({
                 {/* Counselor Actions */}
                 {isCounselor && initialData.status === ReferralStatus.PENDING_COUNSELOR && (
                   <>
-                    <button onClick={() => handleAction(ReferralStatus.RETURNED_TO_HOD, 'تمت المعالجة - إعادة لرئيس القسم', 'counselor')} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2">
+                    <button onClick={() => handleAction(ReferralStatus.RETURNED_TO_HOD, 'تمت المعالجة - إعادة لرئيس القسم', 'counselor')} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 flex-1">
                       <CheckCircle size={18} /> تمت المعالجة وإعادة للرئيس
                     </button>
-                    <button onClick={() => handleAction(ReferralStatus.RETURNED_TO_HOD, 'توصية بالرفع لشؤون المتدربين', 'counselor')} className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center gap-2">
+                    <button onClick={() => handleAction(ReferralStatus.RETURNED_TO_HOD, 'توصية بالرفع لشؤون المتدربين', 'counselor')} className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center justify-center gap-2 flex-1">
                       <AlertTriangle size={18} /> توصية لشؤون المتدربين
                     </button>
                   </>

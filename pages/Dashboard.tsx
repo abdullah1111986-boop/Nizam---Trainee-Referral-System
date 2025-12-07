@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Referral, ReferralStatus, CaseType } from '../types';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
-import { Users, FileText, CheckCircle, Clock, AlertTriangle, AlertOctagon, ArrowLeft } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { Users, FileText, CheckCircle, AlertTriangle, AlertOctagon } from 'lucide-react';
 
 interface DashboardProps {
   referrals: Referral[];
@@ -67,7 +67,7 @@ const Dashboard: React.FC<DashboardProps> = ({ referrals }) => {
 
   return (
     <div className="space-y-6 animate-fade-in no-print">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         <StatCard title="إجمالي الإحالات" value={stats.total} icon={<FileText size={24} />} color="bg-blue-500" />
         <StatCard title="تم الحل والإغلاق" value={stats.completed} icon={<CheckCircle size={24} />} color="bg-green-500" />
         <StatCard title="لدى المرشد" value={stats.withCounselor} icon={<Users size={24} />} color="bg-purple-500" />
@@ -134,7 +134,7 @@ const Dashboard: React.FC<DashboardProps> = ({ referrals }) => {
                   <p className="font-semibold text-gray-800">{referral.traineeName}</p>
                   <p className="text-xs text-gray-500">{referral.caseTypes.join(', ')}</p>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full ${
+                <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
                   referral.status === ReferralStatus.RESOLVED ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
                 }`}>
                   {referral.status}
