@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import MobileNav from './components/MobileNav';
 import Dashboard from './pages/Dashboard';
@@ -7,8 +7,8 @@ import NewReferral from './pages/NewReferral';
 import ReferralsList from './pages/ReferralsList';
 import StaffManagement from './pages/StaffManagement';
 import Profile from './pages/Profile';
-import { Referral, Trainee, Staff, UserRole } from './types';
-import { UserCircle2, Lock, ChevronDown } from 'lucide-react';
+import { Referral, Trainee, Staff, UserRole, ReferralStatus } from './types';
+import { UserCircle2, Lock, ChevronDown, Bell } from 'lucide-react';
 
 // Mock Initial Data (Kept for structure, though manual entry is used now)
 const MOCK_TRAINEES: Trainee[] = [];
@@ -92,6 +92,9 @@ const App: React.FC = () => {
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
 
+  // Notification UI State
+  const [showNotifications, setShowNotifications] = useState(false);
+
   // App Data State
   const [activePage, setActivePage] = useState('dashboard');
   const [trainees, setTrainees] = useState<Trainee[]>(() => {
@@ -124,6 +127,31 @@ const App: React.FC = () => {
     localStorage.setItem('staff', JSON.stringify(staff));
   }, [staff]);
 
+  // --- Notification Logic ---
+  const pendingReferrals = useMemo(() => {
+    if (!currentUser) return [];
+
+    let filtered: Referral[] = [];
+
+    // HOD Logic: Pending approvals matching specialization
+    if (currentUser.role === UserRole.HOD) {
+      filtered = referrals.filter(r => 
+        (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) &&
+        r.specialization === currentUser.specialization
+      );
+    } 
+    // Counselor Logic: Pending cases assigned to Counselor
+    else if (currentUser.isCounselor) {
+      filtered = referrals.filter(r => r.status === ReferralStatus.PENDING_COUNSELOR);
+    }
+    // Trainer Logic: Optional - maybe show cases returned to them? 
+    // For now, let's keep it clean: no "Action Required" for trainer unless explicitly requested.
+    
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [referrals, currentUser]);
+
+  const notificationCount = pendingReferrals.length;
+
   // Auth Handlers
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,6 +183,7 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setLoginUser('');
     setLoginPass('');
+    setShowNotifications(false);
   };
 
   const handleUpdatePassword = (newPass: string) => {
@@ -180,6 +209,7 @@ const App: React.FC = () => {
   const handleEditReferral = (referral: Referral) => {
     setEditingReferral(referral);
     setActivePage('new-referral');
+    setShowNotifications(false); // Close dropdown if open
   };
 
   // Render Login Screen
@@ -306,6 +336,7 @@ const App: React.FC = () => {
         }} 
         currentUserRole={effectiveRole}
         onLogout={handleLogout}
+        notificationCount={notificationCount}
       />
       
       <main className="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-8 flex flex-col">
@@ -322,8 +353,54 @@ const App: React.FC = () => {
             <p className="text-gray-500 text-sm mt-1">الكلية التقنية بالطائف - قسم التقنية الميكانيكية</p>
           </div>
           
-          <div className="flex items-center gap-4 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 px-3">
+          <div className="flex items-center gap-4">
+            
+            {/* Notification Bell */}
+            <div className="relative z-10">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 bg-white rounded-xl shadow-sm border border-gray-100 text-gray-600 hover:text-blue-600 transition"
+              >
+                <Bell size={24} />
+                {notificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full animate-pulse border-2 border-white">
+                    {notificationCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="absolute left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                  <div className="p-3 border-b border-gray-100 font-bold text-gray-700 bg-gray-50">
+                    الإشعارات ({notificationCount})
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {pendingReferrals.length > 0 ? (
+                      pendingReferrals.map((referral) => (
+                        <div 
+                          key={referral.id}
+                          onClick={() => handleEditReferral(referral)}
+                          className="p-3 border-b border-gray-50 hover:bg-blue-50 cursor-pointer transition flex flex-col gap-1"
+                        >
+                          <div className="flex justify-between items-start">
+                            <span className="font-bold text-sm text-gray-800">{referral.traineeName}</span>
+                            <span className="text-[10px] text-gray-400">{new Date(referral.date).toLocaleDateString('ar-SA')}</span>
+                          </div>
+                          <p className="text-xs text-blue-600 font-medium truncate">{referral.status}</p>
+                          <p className="text-xs text-gray-500 truncate">{referral.caseTypes.join(', ')}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-6 text-center text-gray-400 text-sm">
+                        لا توجد إشعارات جديدة
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100 px-3">
               <UserCircle2 className="text-blue-600" />
               <div className="text-sm">
                 <p className="font-bold text-gray-800">{currentUser?.name}</p>
@@ -346,6 +423,7 @@ const App: React.FC = () => {
           setActivePage(page);
         }} 
         currentUserRole={effectiveRole}
+        notificationCount={notificationCount}
       />
     </div>
   );

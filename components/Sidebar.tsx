@@ -7,9 +7,10 @@ interface SidebarProps {
   setActivePage: (page: string) => void;
   currentUserRole: UserRole;
   onLogout: () => void;
+  notificationCount: number;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, currentUserRole, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, currentUserRole, onLogout, notificationCount }) => {
   
   const getLabelForReferrals = () => {
     switch (currentUserRole) {
@@ -27,7 +28,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, currentUse
       visible: currentUserRole === UserRole.HOD || currentUserRole === UserRole.COUNSELOR 
     },
     { id: 'new-referral', label: 'إحالة جديدة', icon: <FilePlus size={20} />, visible: currentUserRole === UserRole.TRAINER }, 
-    { id: 'referrals', label: getLabelForReferrals(), icon: <FolderOpen size={20} />, visible: true },
+    { 
+      id: 'referrals', 
+      label: getLabelForReferrals(), 
+      icon: <FolderOpen size={20} />, 
+      visible: true,
+      badge: notificationCount > 0 ? notificationCount : undefined
+    },
     { id: 'staff', label: 'إدارة المدربين', icon: <Users size={20} />, visible: currentUserRole === UserRole.HOD },
     { id: 'profile', label: 'الإعدادات', icon: <Settings size={20} />, visible: true },
   ];
@@ -45,14 +52,21 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, currentUse
           <button
             key={item.id}
             onClick={() => setActivePage(item.id)}
-            className={`w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-lg transition-colors duration-200 ${
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${
               activePage === item.id
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-slate-300 hover:bg-slate-700 hover:text-white'
             }`}
           >
-            {item.icon}
-            <span className="font-medium">{item.label}</span>
+            <div className="flex items-center space-x-3 space-x-reverse">
+              {item.icon}
+              <span className="font-medium">{item.label}</span>
+            </div>
+            {item.badge && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                {item.badge}
+              </span>
+            )}
           </button>
         ))}
       </nav>
