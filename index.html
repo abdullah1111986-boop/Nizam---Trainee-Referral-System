@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
   <head>
@@ -18,6 +19,11 @@
 
     <!-- html2pdf for PDF Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+      // معالج لمنع انهيار التطبيق في حال عدم وجود متغيرات البيئة
+      window.process = window.process || { env: { API_KEY: "" } };
+    </script>
 
     <style>
       body {
@@ -86,7 +92,7 @@
     "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
     "firebase/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js",
-    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/"
+    "firebase/": "https://esm.sh/firebase@^12.7.0/"
   }
 }
 </script>

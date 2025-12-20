@@ -2,11 +2,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { CaseType, Repetition } from "../types";
 
-// Initialize Gemini Client
-// The API key is obtained exclusively from the environment variable process.env.API_KEY.
-// Following the guideline to use the named parameter and direct process.env access.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-
 export const analyzeCaseWithGemini = async (
   caseDetails: string,
   caseTypes: CaseType[],
@@ -14,6 +9,16 @@ export const analyzeCaseWithGemini = async (
   previousActions: string
 ): Promise<string> => {
   try {
+    // الحصول على مفتاح الـ API بشكل آمن عند الحاجة فقط
+    const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) || "";
+    
+    if (!apiKey) {
+      console.warn("Gemini API Key is missing.");
+      return "عذراً، ميزة تحليل الذكاء الاصطناعي غير متاحة حالياً لعدم توفر مفتاح التشغيل.";
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    
     const prompt = `
       بصفتك مستشاراً تربوياً وتدريبياً خبيراً، قم بتحليل حالة المتدرب التالية واقترح حلولاً عملية ومهنية للمرشد الطلابي.
       
@@ -27,13 +32,11 @@ export const analyzeCaseWithGemini = async (
       قدم توصية موجزة ومهنية (لا تتجاوز 100 كلمة) تتضمن خطوات إجرائية يمكن للمرشد التدريبي اتخاذها لحل هذه المشكلة وتعديل سلوك المتدرب أو تحسين مستواه.
     `;
 
-    // Using gemini-3-pro-preview for complex reasoning and analysis tasks as per guidelines
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
     });
 
-    // Access the text property directly as per Gemini API guidelines (not a method call)
     return response.text || "لم يتم إنشاء تحليل.";
   } catch (error) {
     console.error("Error calling Gemini API:", error);
