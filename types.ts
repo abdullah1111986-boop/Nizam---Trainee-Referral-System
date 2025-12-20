@@ -1,3 +1,4 @@
+
 export enum CaseType {
   BEHAVIOR = 'مخالفة قواعد تنظيم السلوك والمواظبة',
   LOW_PERFORMANCE = 'انخفاض المستوى التدريبي',
@@ -48,11 +49,12 @@ export interface Trainee {
 export interface Staff {
   id: string;
   name: string;
-  username: string; // Used for login (Phone number usually)
+  username: string; 
   password?: string;
   role: UserRole;
-  specialization?: string; // Important for HoD routing
-  isCounselor?: boolean; // A flag to designate a trainer as a counselor
+  specialization?: string; 
+  isCounselor?: boolean; 
+  telegramChatId?: string; // Added for notifications
 }
 
 export interface Referral {
@@ -61,27 +63,23 @@ export interface Referral {
   traineeName: string; 
   trainingNumber: string;
   department: string;
-  specialization: string; // Added to route to correct HoD
+  specialization: string; 
   date: string;
   
-  // Trainer Section
-  trainerId: string; // To track who created it
+  trainerId: string; 
   trainerName: string;
   caseDetails: string;
   caseTypes: CaseType[];
   repetition: Repetition;
   previousActions: string;
   
-  // Workflow Tracking
   status: ReferralStatus;
   timeline: TimelineEvent[];
   
-  // Digital Signatures (Flags)
   trainerSignature: boolean;
   hodSignature: boolean;
   counselorSignature: boolean;
 
-  // Analysis
   aiSuggestion?: string;
 }
 

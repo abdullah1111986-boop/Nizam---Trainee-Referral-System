@@ -1,6 +1,9 @@
+
 import React, { useState } from 'react';
 import { Staff, UserRole } from '../types';
-import { UserPlus, RefreshCw, Trash2, ShieldCheck, Search } from 'lucide-react';
+import { UserPlus, RefreshCw, Trash2, ShieldCheck, Search, Send } from 'lucide-react';
+import { db } from '../services/firebase';
+import { doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 
 interface StaffManagementProps {
   staff: Staff[];
@@ -8,130 +11,76 @@ interface StaffManagementProps {
   currentUserSpecialization?: string;
 }
 
-const StaffManagement: React.FC<StaffManagementProps> = ({ staff, setStaff, currentUserSpecialization }) => {
+const StaffManagement: React.FC<StaffManagementProps> = ({ staff, currentUserSpecialization }) => {
   const [newStaffName, setNewStaffName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Filter: HoDs only manage trainers in their specialization (optional logic, but good for large orgs)
-  // For now, we allow HoD to see all trainers to assign Counselor easily.
   const displayedStaff = staff.filter(s => 
     s.role === UserRole.TRAINER && 
     (s.name.includes(searchTerm) || s.username.includes(searchTerm))
   );
 
-  const handleAddStaff = (e: React.FormEvent) => {
+  const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStaffName) {
-      alert('الرجاء تعبئة اسم المدرب');
-      return;
-    }
-
-    if (staff.some(s => s.name === newStaffName)) {
-      alert('هذا الاسم مسجل مسبقاً');
-      return;
-    }
-
+    if (!newStaffName) return;
+    const newId = Date.now().toString();
     const newTrainer: Staff = {
-      id: Date.now().toString(),
+      id: newId,
       name: newStaffName,
-      username: newStaffName, // Username matches Name for dropdown login
-      password: '1234', // Default password
+      username: newStaffName,
+      password: '1234',
       role: UserRole.TRAINER,
-      specialization: currentUserSpecialization, // Inherit department from HoD
+      specialization: currentUserSpecialization,
       isCounselor: false
     };
-
-    setStaff([...staff, newTrainer]);
+    await setDoc(doc(db, 'staff', newId), newTrainer);
     setNewStaffName('');
-    alert(`تم إضافة المدرب بنجاح. كلمة المرور الافتراضية: 1234`);
   };
 
-  const handleResetPassword = (id: string) => {
+  const handleResetPassword = async (id: string) => {
     if (confirm('هل أنت متأكد من إعادة تعيين كلمة المرور إلى "1234"؟')) {
-      setStaff(staff.map(s => s.id === id ? { ...s, password: '1234' } : s));
-      alert('تم إعادة تعيين كلمة المرور.');
+      await updateDoc(doc(db, 'staff', id), { password: '1234' });
     }
   };
 
-  const toggleCounselorRole = (id: string) => {
-    const target = staff.find(s => s.id === id);
-    if (!target) return;
-
-    const newStatus = !target.isCounselor;
-    const msg = newStatus 
-      ? `هل تريد تعيين ${target.name} مشرفاً للإرشاد والتوجيه؟` 
-      : `هل تريد إلغاء صلاحية الإرشاد عن ${target.name}؟`;
-
-    if (confirm(msg)) {
-      setStaff(staff.map(s => s.id === id ? { ...s, isCounselor: newStatus } : s));
-    }
+  const toggleCounselorRole = async (id: string, currentStatus: boolean) => {
+    await updateDoc(doc(db, 'staff', id), { isCounselor: !currentStatus });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا الحساب؟')) {
-      setStaff(staff.filter(s => s.id !== id));
+      await deleteDoc(doc(db, 'staff', id));
     }
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Add New Trainer Form */}
         <div className="lg:col-span-1">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <UserPlus size={20} /> إضافة مدرب جديد
-            </h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><UserPlus size={20} /> إضافة مدرب جديد</h3>
             <form onSubmit={handleAddStaff} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">الاسم الثلاثي</label>
-                <input
-                  type="text"
-                  value={newStaffName}
-                  onChange={(e) => setNewStaffName(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="مثال: محمد علي الاسمري"
-                />
-              </div>
-              <div className="text-sm text-gray-500 bg-blue-50 p-2 rounded">
-                سيظهر الاسم في قائمة الدخول.
-                <br/>
-                كلمة المرور الافتراضية: <strong>1234</strong>
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-bold"
-              >
-                إضافة الحساب
-              </button>
+              <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full p-2 border rounded-lg" placeholder="الاسم الثلاثي" />
+              <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">إضافة</button>
             </form>
           </div>
         </div>
 
-        {/* Staff List */}
         <div className="lg:col-span-2">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-800">قائمة المدربين</h3>
               <div className="relative w-64">
-                <Search className="absolute right-3 top-2.5 text-gray-400" size={16} />
-                <input
-                  type="text"
-                  placeholder="بحث بالاسم..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pr-9 pl-4 py-2 border border-gray-200 rounded-lg text-sm"
-                />
+                <Search className="absolute right-3 top-2.5 text-gray-400" size={16} /><input type="text" placeholder="بحث..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pr-9 pl-4 py-2 border rounded-lg text-sm" />
               </div>
             </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-right text-sm">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    <th className="p-3">الاسم (اسم المستخدم)</th>
-                    <th className="p-3">الصلاحيات</th>
+                    <th className="p-3">الاسم</th>
+                    <th className="p-3">الإشعارات</th>
+                    <th className="p-3">الصلاحية</th>
                     <th className="p-3">إجراءات</th>
                   </tr>
                 </thead>
@@ -140,41 +89,17 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ staff, setStaff, curr
                     <tr key={s.id} className="hover:bg-gray-50">
                       <td className="p-3 font-medium">{s.name}</td>
                       <td className="p-3">
-                        <button 
-                          onClick={() => toggleCounselorRole(s.id)}
-                          className={`flex items-center gap-1 px-2 py-1 rounded border transition ${
-                            s.isCounselor 
-                              ? 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200' 
-                              : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-                          }`}
-                        >
-                          <ShieldCheck size={14} />
-                          {s.isCounselor ? 'مشرف إرشاد' : 'مدرب فقط'}
-                        </button>
+                        {s.telegramChatId ? <span className="flex items-center text-green-600 gap-1 text-[10px]"><Send size={10}/> مفعلة</span> : <span className="text-gray-400 text-[10px]">غير مفعلة</span>}
                       </td>
-                      <td className="p-3 flex items-center gap-2">
-                        <button 
-                          onClick={() => handleResetPassword(s.id)}
-                          className="text-orange-500 hover:bg-orange-50 p-2 rounded"
-                          title="إعادة تعيين كلمة المرور"
-                        >
-                          <RefreshCw size={16} />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(s.id)}
-                          className="text-red-500 hover:bg-red-50 p-2 rounded"
-                          title="حذف"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                      <td className="p-3">
+                        <button onClick={() => toggleCounselorRole(s.id, !!s.isCounselor)} className={`text-[10px] px-2 py-1 rounded border ${s.isCounselor ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'}`}>{s.isCounselor ? 'مشرف إرشاد' : 'مدرب'}</button>
+                      </td>
+                      <td className="p-3 flex gap-2">
+                        <button onClick={() => handleResetPassword(s.id)} className="text-orange-500"><RefreshCw size={16} /></button>
+                        <button onClick={() => handleDelete(s.id)} className="text-red-500"><Trash2 size={16} /></button>
                       </td>
                     </tr>
                   ))}
-                  {displayedStaff.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="p-6 text-center text-gray-400">لا يوجد مدربين مطابقين</td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
