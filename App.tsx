@@ -101,46 +101,36 @@ const App: React.FC = () => {
   const triggerNotifications = async (r: Referral) => {
     if (!currentUser || !staff.length) return;
 
-    // الشرط الأساسي: الإرسال فقط للحالات المعلقة لدى رئيس القسم أو المرشد
-    const isPendingHOD = r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD;
-    const isPendingCounselor = r.status === ReferralStatus.PENDING_COUNSELOR;
-
-    if (!isPendingHOD && !isPendingCounselor) {
-      return;
-    }
-
     const lastEvent = r.timeline[r.timeline.length - 1];
     const msg = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
     
     let recipientsToNotify: Staff[] = [];
     
-    // 1. تحديد المستلمين الأساسيين بناءً على الحالة
-    if (isPendingHOD) {
-      // إرسال لرئيس القسم بناءً على التخصص
+    // 1. دائماً نضيف المدرب الأصلي لصاحب الإحالة ليتابع حالتها في جميع المراحل
+    const originalTrainer = staff.find(s => s.id === r.trainerId);
+    if (originalTrainer) {
+      recipientsToNotify.push(originalTrainer);
+    }
+
+    // 2. إذا كانت الحالة بانتظار رئيس القسم، نضيف رؤساء الأقسام المعنيين بالتخصص
+    if (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) {
       const HODs = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
       recipientsToNotify.push(...HODs);
-    } else if (isPendingCounselor) {
-      // إرسال للمرشدين التدريبيين
+    } 
+    
+    // 3. إذا كانت الحالة بانتظار المرشد، نضيف جميع المرشدين
+    if (r.status === ReferralStatus.PENDING_COUNSELOR) {
       const counselors = staff.filter(s => s.isCounselor);
       recipientsToNotify.push(...counselors);
     }
 
-    // 2. معالجة حالة: إذا كان منشئ الإحالة شخص آخر غير المدرب المعني
-    const isNewReferral = r.timeline.length === 1;
-    if (isNewReferral && currentUser.id !== r.trainerId) {
-      const trainer = staff.find(s => s.id === r.trainerId);
-      if (trainer && !recipientsToNotify.find(recp => recp.id === trainer.id)) {
-        recipientsToNotify.push(trainer);
-      }
-    }
-
-    // 3. تصفية القائمة: استثناء المستخدم الحالي، وضمان وجود معرف تيليجرام، ومنع التكرار
+    // 4. تصفية القائمة: استثناء المستخدم الحالي، وضمان وجود معرف تيليجرام، ومنع التكرار
     const uniqueRecipients = Array.from(new Set(recipientsToNotify.map(s => s.id)))
       .map(id => staff.find(s => s.id === id))
       .filter((s): s is Staff => 
         !!s && 
         !!s.telegramChatId && 
-        s.id !== currentUser.id
+        s.id !== currentUser.id // لا ترسل إشعاراً للشخص الذي قام بالإجراء نفسه
       );
 
     for (const recipient of uniqueRecipients) {
