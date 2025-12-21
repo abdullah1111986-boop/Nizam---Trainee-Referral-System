@@ -3,7 +3,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
 /**
- * إعدادات مشروع Firebase
+ * إعدادات مشروع Firebase المحدثة
  */
 const firebaseConfig = {
   apiKey: "AIzaSyC019dSsE2ElPDRPDyccVabYJLm7pWOM3U",
@@ -15,17 +15,16 @@ const firebaseConfig = {
   measurementId: "G-JCY1QLJRBC"
 };
 
-// تهيئة تطبيق Firebase (Singleton)
+// تهيئة تطبيق Firebase كنسخة وحيدة (Singleton)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 /**
- * تصدير نسخة Firestore
- * يتم تمرير 'app' لضمان أن Firestore يستخدم الإعدادات الصحيحة والنسخة المهيأة
+ * تصدير نسخة Firestore المرتبطة بالتطبيق المهيأ
  */
 export const db = getFirestore(app);
 
 /**
- * تهيئة التحليلات بشكل آمن
+ * تهيئة التحليلات (Analytics) بشكل آمن
  */
 export const analytics = typeof window !== 'undefined'
   ? isSupported().then((supported) => (supported ? getAnalytics(app) : null))

@@ -1,6 +1,8 @@
+
+// Add React import to fix namespace 'React' and 'React.FC' errors
 import React, { useRef, useState } from 'react';
 import { Trainee, Staff } from '../types';
-import { Upload, FileSpreadsheet, Users, Trash2, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, Users, Trash2, CheckCircle, AlertCircle, Loader2, Info, XCircle, FileWarning } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -17,18 +19,23 @@ interface DataImportProps {
 
 const DataImport: React.FC<DataImportProps> = ({ trainees, setTrainees, staff, setStaff }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importStatus, setImportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [importStatus, setImportStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'partial'>('idle');
   const [message, setMessage] = useState('');
+  const [errorDetails, setErrorDetails] = useState<string[]>([]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reset state
     setImportStatus('loading');
+    setMessage('');
+    setErrorDetails([]);
 
     if (!window.XLSX) {
       setImportStatus('error');
-      setMessage('مكتبة معالجة الملفات غير متوفرة. تأكد من الاتصال بالإنترنت.');
+      setMessage('مكتبة معالجة الملفات (SheetJS) غير متوفرة.');
+      setErrorDetails(['يرجى التأكد من اتصالك بالإنترنت وإعادة تحميل الصفحة.', 'تعتمد هذه الميزة على مكتبات خارجية يتم تحميلها من الـ CDN.']);
       return;
     }
 
@@ -39,35 +46,71 @@ const DataImport: React.FC<DataImportProps> = ({ trainees, setTrainees, staff, s
         const wb = window.XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = window.XLSX.utils.sheet_to_json(ws);
+        const data: any[] = window.XLSX.utils.sheet_to_json(ws);
 
-        const newTrainees: Trainee[] = data.map((row: any, index: number) => ({
-          id: row['ID'] || row['الرقم'] || Date.now().toString() + index,
-          name: row['Name'] || row['الاسم'] || row['اسم المتدرب'] || 'غير معروف',
-          trainingNumber: String(row['Training Number'] || row['الرقم التدريبي'] || '000'),
-          department: row['Department'] || row['القسم'] || 'التقنية الميكانيكية',
-          specialization: row['Specialization'] || row['التخصص'] || '',
-        }));
+        if (data.length === 0) {
+          setImportStatus('error');
+          setMessage('الملف المرفوع فارغ.');
+          setErrorDetails(['تأكد من أن ملف Excel يحتوي على بيانات في الورقة الأولى.', 'يرجى مراجعة محتوى الملف وحاول مرة أخرى.']);
+          return;
+        }
+
+        // التحقق من وجود الأعمدة الأساسية في أول سجل
+        const firstRow = data[0];
+        const columns = Object.keys(firstRow);
+        const hasName = columns.some(c => ['Name', 'الاسم', 'اسم المتدرب'].includes(c));
+        const hasNumber = columns.some(c => ['Training Number', 'الرقم التدريبي', 'رقم التدريب'].includes(c));
+
+        if (!hasName || !hasNumber) {
+          setImportStatus('error');
+          setMessage('لم يتم العثور على الأعمدة المطلوبة.');
+          setErrorDetails([
+            !hasName ? 'ناقص: عمود الاسم (يجب أن يكون العنوان "الاسم" أو "Name")' : '',
+            !hasNumber ? 'ناقص: عمود الرقم التدريبي (يجب أن يكون العنوان "الرقم التدريبي" أو "Training Number")' : '',
+            'تأكد من أن الصف الأول في الملف يحتوي على هذه العناوين بالضبط.'
+          ].filter(Boolean));
+          return;
+        }
+
+        const newTrainees: Trainee[] = data
+          .filter(row => (row['Name'] || row['الاسم'] || row['اسم المتدرب']) && (row['Training Number'] || row['الرقم التدريبي']))
+          .map((row: any, index: number) => ({
+            id: row['ID'] || row['الرقم'] || Date.now().toString() + index,
+            name: row['Name'] || row['الاسم'] || row['اسم المتدرب'],
+            trainingNumber: String(row['Training Number'] || row['الرقم التدريبي']),
+            department: row['Department'] || row['القسم'] || 'التقنية الميكانيكية',
+            specialization: row['Specialization'] || row['التخصص'] || '',
+          }));
 
         if (newTrainees.length > 0) {
           setTrainees([...trainees, ...newTrainees]);
-          setImportStatus('success');
-          setMessage(`تم استيراد ${newTrainees.length} متدرب بنجاح إلى القائمة المحلية.`);
+          if (newTrainees.length < data.length) {
+            setImportStatus('partial');
+            setMessage(`تم استيراد ${newTrainees.length} متدرب، ولكن تم تخطي ${data.length - newTrainees.length} سجلات غير مكتملة.`);
+          } else {
+            setImportStatus('success');
+            setMessage(`تم استيراد ${newTrainees.length} متدرب بنجاح!`);
+          }
         } else {
           setImportStatus('error');
-          setMessage('لم يتم العثور على بيانات صالحة في الملف. تأكد من وجود أعمدة (الاسم، الرقم التدريبي).');
+          setMessage('البيانات في الملف غير صالحة.');
+          setErrorDetails(['تأكد من تعبئة حقول الاسم والرقم التدريبي لجميع المتدربين.', 'الملف لا يحتوي على أي سجلات مكتملة المعالم.']);
         }
       } catch (err) {
         console.error(err);
         setImportStatus('error');
-        setMessage('حدث خطأ أثناء قراءة الملف. تأكد من صيغة ملف Excel (.xlsx أو .xls).');
+        setMessage('حدث خطأ تقني أثناء معالجة الملف.');
+        setErrorDetails(['تأكد من أن الملف ليس تالفاً.', 'حاول حفظ الملف بصيغة .xlsx وحاول مجدداً.']);
       }
     };
     reader.onerror = () => {
       setImportStatus('error');
-      setMessage('فشل قراءة الملف.');
+      setMessage('فشل في قراءة الملف من الجهاز.');
     };
     reader.readAsBinaryString(file);
+    
+    // Clear input value so same file can be uploaded again if fixed
+    if (e.target) e.target.value = '';
   };
 
   return (
@@ -106,27 +149,50 @@ const DataImport: React.FC<DataImportProps> = ({ trainees, setTrainees, staff, s
               />
             </div>
 
-            {importStatus === 'success' && (
-              <div className="mt-6 p-4 bg-green-50 border border-green-100 text-green-700 rounded-2xl text-xs font-bold flex items-center gap-2 animate-bounce">
-                <CheckCircle size={16} /> {message}
+            {/* عرض الرسائل بناءً على الحالة */}
+            {(importStatus === 'success' || importStatus === 'partial') && (
+              <div className={`mt-6 p-4 rounded-2xl text-xs font-bold flex flex-col gap-2 ${importStatus === 'success' ? 'bg-green-50 border border-green-100 text-green-700' : 'bg-amber-50 border border-amber-100 text-amber-700'}`}>
+                <div className="flex items-center gap-2">
+                  {importStatus === 'success' ? <CheckCircle size={16} /> : <FileWarning size={16} />}
+                  <span>{message}</span>
+                </div>
               </div>
             )}
+
             {importStatus === 'error' && (
-              <div className="mt-6 p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs font-bold flex items-center gap-2">
-                <AlertCircle size={16} /> {message}
+              <div className="mt-6 space-y-3">
+                <div className="p-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl text-xs font-bold flex items-center gap-2">
+                  <XCircle size={16} /> {message}
+                </div>
+                {errorDetails.length > 0 && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <p className="text-[10px] font-black text-slate-500 mb-2 uppercase flex items-center gap-1">
+                      <Info size={12}/> خطوات مقترحة للحل:
+                    </p>
+                    <ul className="space-y-1.5">
+                      {errorDetails.map((detail, i) => (
+                        <li key={i} className="text-[11px] text-slate-600 font-bold leading-tight flex items-start gap-1.5">
+                          <span className="text-red-400 mt-0.5">•</span>
+                          {detail}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           <div className="bg-slate-900 text-white p-8 rounded-[2rem] shadow-xl">
              <h4 className="font-black text-sm mb-4 flex items-center gap-2 text-blue-400">
-               <AlertCircle size={16}/> ملاحظات هامة
+               <AlertCircle size={16}/> متطلبات الملف
              </h4>
              <ul className="text-[11px] space-y-3 font-bold text-slate-400 leading-relaxed">
-               <li>• يجب أن يحتوي الملف على رؤوس أعمدة واضحة.</li>
-               <li>• الأعمدة المدعومة: (الاسم، الرقم التدريبي، التخصص).</li>
-               <li>• سيتم إضافة البيانات الجديدة إلى القائمة الحالية دون مسحها.</li>
-               <li>• هذه البيانات تُحفظ مؤقتاً في جلسة العمل الحالية.</li>
+               <li>• الصف الأول يجب أن يحتوي على العناوين.</li>
+               <li>• <b>الاسم:</b> الاسم الثلاثي للمتدرب.</li>
+               <li>• <b>الرقم التدريبي:</b> الرقم المكون من 9 خانات.</li>
+               <li>• <b>التخصص:</b> (اختياري) محركات أو تصنيع.</li>
+               <li>• سيتم تخطي أي صف لا يحتوي على اسم ورقم تدريبي.</li>
              </ul>
           </div>
         </div>
@@ -145,7 +211,7 @@ const DataImport: React.FC<DataImportProps> = ({ trainees, setTrainees, staff, s
               </div>
               {trainees.length > 0 && (
                 <button 
-                  onClick={() => { if(confirm('هل تريد مسح جميع بيانات المتدربين المستوردة؟')) setTrainees([]); }}
+                  onClick={() => { if(confirm('هل تريد مسح جميع بيانات المتدربين المستوردة؟')) { setTrainees([]); setImportStatus('idle'); } }}
                   className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all active:scale-95"
                 >
                   <Trash2 size={14} /> مسح الكل

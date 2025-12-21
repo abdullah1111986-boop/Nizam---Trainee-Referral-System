@@ -19,6 +19,7 @@ const INITIAL_STAFF: Staff[] = [
   { id: 'counselor1', name: 'ماجد ابراهيم المرزوقي', username: 'ماجد ابراهيم المرزوقي', password: '123', role: UserRole.TRAINER, specialization: 'توجيه وإرشاد', isCounselor: true },
 ];
 
+// Fix: Import React to resolve 'Cannot find namespace React' on line 22
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<Staff | null>(null);
@@ -86,6 +87,7 @@ const App: React.FC = () => {
     }).length;
   }, [referrals, currentUser]);
 
+  // Fix: Import React to resolve 'Cannot find namespace React' on line 89
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const user = staff.find(s => s.username === loginUser && s.password === loginPass);
@@ -100,18 +102,35 @@ const App: React.FC = () => {
 
   const triggerNotifications = async (r: Referral) => {
     if (!currentUser || !staff.length) return;
+
+    // إرسال الإشعارات فقط عند تغيير الحالة إلى "بانتظار رئيس القسم" أو "بانتظار المرشد"
+    const isPendingHOD = r.status === ReferralStatus.PENDING_HOD;
+    const isPendingCounselor = r.status === ReferralStatus.PENDING_COUNSELOR;
+
+    if (!isPendingHOD && !isPendingCounselor) {
+      return;
+    }
+
     const lastEvent = r.timeline[r.timeline.length - 1];
     const msg = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
+    
     let targetRecipients: Staff[] = [];
-    if (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) {
+    
+    if (isPendingHOD) {
+      // إرسال لرئيس القسم بناءً على التخصص
       targetRecipients = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
-    } else if (r.status === ReferralStatus.PENDING_COUNSELOR) {
+    } else if (isPendingCounselor) {
+      // إرسال للمرشدين التدريبيين
       targetRecipients = staff.filter(s => s.isCounselor);
-    } else if (r.status === ReferralStatus.RESOLVED) {
-      targetRecipients = staff.filter(s => s.id === r.trainerId);
     }
-    const recipientsWithChatId = targetRecipients.filter(s => !!s.telegramChatId);
-    for (const recipient of recipientsWithChatId) {
+
+    // استثناء المستخدم الحالي من قائمة المستلمين وضمان وجود معرف تيليجرام
+    const recipientsToNotify = targetRecipients.filter(s => 
+      s.telegramChatId && 
+      s.id !== currentUser.id
+    );
+
+    for (const recipient of recipientsToNotify) {
       if (recipient.telegramChatId) {
         await sendTelegramNotification(recipient.telegramChatId, msg);
       }
