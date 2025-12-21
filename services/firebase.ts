@@ -15,16 +15,17 @@ const firebaseConfig = {
   measurementId: "G-JCY1QLJRBC"
 };
 
-// تهيئة تطبيق Firebase
+// تهيئة تطبيق Firebase (Singleton)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 /**
  * تصدير نسخة Firestore
+ * يتم تمرير 'app' لضمان أن Firestore يستخدم الإعدادات الصحيحة والنسخة المهيأة
  */
 export const db = getFirestore(app);
 
 /**
- * تهيئة التحليلات
+ * تهيئة التحليلات بشكل آمن
  */
 export const analytics = typeof window !== 'undefined'
   ? isSupported().then((supported) => (supported ? getAnalytics(app) : null))
