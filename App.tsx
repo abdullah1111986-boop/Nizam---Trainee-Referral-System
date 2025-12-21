@@ -14,12 +14,11 @@ import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, order
 import { sendTelegramNotification, formatReferralMessage } from './services/telegramService';
 
 const INITIAL_STAFF: Staff[] = [
-  { id: 'hod1', name: 'م. عبدالله الزهراني', username: 'م. عبدالله الزهراني', password: '123', role: UserRole.HOD, specialization: 'محركات ومركبات' },
+  { id: 'hod1', name: 'م. عبدالله الزهراني', username: 'م. عبدالله Zahrani', password: '123', role: UserRole.HOD, specialization: 'محركات ومركبات' },
   { id: 'hod2', name: 'م. ياسر الشربي', username: 'م. ياسر الشربي', password: '123', role: UserRole.HOD, specialization: 'تصنيع' },
   { id: 'counselor1', name: 'ماجد ابراهيم المرزوقي', username: 'ماجد ابراهيم المرزوقي', password: '123', role: UserRole.TRAINER, specialization: 'توجيه وإرشاد', isCounselor: true },
 ];
 
-// Fix: Import React to resolve 'Cannot find namespace React' on line 22
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<Staff | null>(null);
@@ -87,7 +86,6 @@ const App: React.FC = () => {
     }).length;
   }, [referrals, currentUser]);
 
-  // Fix: Import React to resolve 'Cannot find namespace React' on line 89
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const user = staff.find(s => s.username === loginUser && s.password === loginPass);
@@ -103,8 +101,8 @@ const App: React.FC = () => {
   const triggerNotifications = async (r: Referral) => {
     if (!currentUser || !staff.length) return;
 
-    // إرسال الإشعارات فقط عند تغيير الحالة إلى "بانتظار رئيس القسم" أو "بانتظار المرشد"
-    const isPendingHOD = r.status === ReferralStatus.PENDING_HOD;
+    // الشرط الأساسي: الإرسال فقط للحالات المعلقة لدى رئيس القسم أو المرشد
+    const isPendingHOD = r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD;
     const isPendingCounselor = r.status === ReferralStatus.PENDING_COUNSELOR;
 
     if (!isPendingHOD && !isPendingCounselor) {
@@ -114,26 +112,39 @@ const App: React.FC = () => {
     const lastEvent = r.timeline[r.timeline.length - 1];
     const msg = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
     
-    let targetRecipients: Staff[] = [];
+    let recipientsToNotify: Staff[] = [];
     
+    // 1. تحديد المستلمين الأساسيين بناءً على الحالة
     if (isPendingHOD) {
       // إرسال لرئيس القسم بناءً على التخصص
-      targetRecipients = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
+      const HODs = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
+      recipientsToNotify.push(...HODs);
     } else if (isPendingCounselor) {
       // إرسال للمرشدين التدريبيين
-      targetRecipients = staff.filter(s => s.isCounselor);
+      const counselors = staff.filter(s => s.isCounselor);
+      recipientsToNotify.push(...counselors);
     }
 
-    // استثناء المستخدم الحالي من قائمة المستلمين وضمان وجود معرف تيليجرام
-    const recipientsToNotify = targetRecipients.filter(s => 
-      s.telegramChatId && 
-      s.id !== currentUser.id
-    );
-
-    for (const recipient of recipientsToNotify) {
-      if (recipient.telegramChatId) {
-        await sendTelegramNotification(recipient.telegramChatId, msg);
+    // 2. معالجة حالة: إذا كان منشئ الإحالة شخص آخر غير المدرب المعني
+    const isNewReferral = r.timeline.length === 1;
+    if (isNewReferral && currentUser.id !== r.trainerId) {
+      const trainer = staff.find(s => s.id === r.trainerId);
+      if (trainer && !recipientsToNotify.find(recp => recp.id === trainer.id)) {
+        recipientsToNotify.push(trainer);
       }
+    }
+
+    // 3. تصفية القائمة: استثناء المستخدم الحالي، وضمان وجود معرف تيليجرام، ومنع التكرار
+    const uniqueRecipients = Array.from(new Set(recipientsToNotify.map(s => s.id)))
+      .map(id => staff.find(s => s.id === id))
+      .filter((s): s is Staff => 
+        !!s && 
+        !!s.telegramChatId && 
+        s.id !== currentUser.id
+      );
+
+    for (const recipient of uniqueRecipients) {
+      await sendTelegramNotification(recipient.telegramChatId!, msg);
     }
   };
 
@@ -146,7 +157,7 @@ const App: React.FC = () => {
         return <NewReferral {...commonProps} trainees={trainees} 
           onSubmit={async (r) => { 
             await setDoc(doc(db, 'referrals', r.id), r); 
-            try { await triggerNotifications(r); } catch (e) {}
+            try { await triggerNotifications(r); } catch (e) { console.error("Notification Error:", e); }
             setEditingReferral(undefined);
             setActivePage('referrals'); 
           }} 
