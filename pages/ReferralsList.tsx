@@ -36,7 +36,8 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
   if (currentUser.role === UserRole.HOD) {
     displayedReferrals = displayedReferrals.filter(r => 
       r.specialization === currentUser.specialization || 
-      r.status === ReferralStatus.PENDING_COUNSELOR
+      r.status === ReferralStatus.PENDING_COUNSELOR ||
+      r.status === ReferralStatus.SENT_TO_SPECIALIST
     );
   } else if (currentUser.role === UserRole.TRAINER) {
      if (currentUser.isCounselor) {
@@ -69,8 +70,10 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
             <option value="all">جميع الحالات</option>
             <option value={ReferralStatus.PENDING_HOD}>بانتظار رئيس القسم</option>
             <option value={ReferralStatus.PENDING_COUNSELOR}>بانتظار المرشد</option>
+            <option value={ReferralStatus.SENT_TO_SPECIALIST}>محال للأخصائي</option>
             <option value={ReferralStatus.RETURNED_TO_HOD}>عاد لرئيس القسم</option>
             <option value={ReferralStatus.RESOLVED}>مكتملة</option>
+            <option value={ReferralStatus.TO_STUDENT_AFFAIRS}>محال لشؤون المتدربين</option>
           </select>
           <div className="relative flex-1 md:w-64 w-full">
             <Search className="absolute right-3 top-2.5 text-gray-400" size={18} />
@@ -115,6 +118,8 @@ const ReferralsList: React.FC<ReferralsListProps> = ({ referrals, onEdit, curren
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
                       referral.status === ReferralStatus.RESOLVED ? 'bg-green-100 text-green-800 border-green-200' : 
                       referral.status === ReferralStatus.PENDING_COUNSELOR ? 'bg-purple-100 text-purple-800 border-purple-200' : 
+                      referral.status === ReferralStatus.SENT_TO_SPECIALIST ? 'bg-cyan-100 text-cyan-800 border-cyan-200' :
+                      referral.status === ReferralStatus.TO_STUDENT_AFFAIRS ? 'bg-red-100 text-red-800 border-red-200' :
                       'bg-orange-100 text-orange-800 border-orange-200'
                     }`}>
                       {referral.status}

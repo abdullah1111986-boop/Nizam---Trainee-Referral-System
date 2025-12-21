@@ -26,7 +26,8 @@ export enum ReferralStatus {
   PENDING_COUNSELOR = 'بانتظار المرشد',
   RETURNED_TO_HOD = 'عاد لرئيس القسم',
   RESOLVED = 'تم الحل',
-  TO_STUDENT_AFFAIRS = 'محال لشؤون المتدربين'
+  TO_STUDENT_AFFAIRS = 'محال لشؤون المتدربين',
+  SENT_TO_SPECIALIST = 'محال للأخصائي'
 }
 
 export interface TimelineEvent {

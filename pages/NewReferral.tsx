@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Trainee, Staff, CaseType, Repetition, ReferralStatus, Referral, UserRole, TimelineEvent } from '../types';
-import { Save, ArrowLeft, Send, CheckCircle, AlertTriangle, Printer, History, Sparkles, Loader2 } from 'lucide-react';
+import { Save, ArrowLeft, Send, CheckCircle, AlertTriangle, Printer, History, Sparkles, Loader2, UserCheck } from 'lucide-react';
 import { analyzeCaseWithGemini } from '../services/geminiService';
 
 interface NewReferralProps {
@@ -115,7 +115,7 @@ const NewReferral: React.FC<NewReferralProps> = ({
 
   const handleAction = (newStatus: ReferralStatus, actionName: string, requiredSignature: 'hod' | 'counselor' | null) => {
     if (!initialData) return;
-    if (!currentActionComment && actionName !== 'تحويل للمرشد') {
+    if (!currentActionComment && actionName !== 'تحويل للمرشد' && actionName !== 'تحويل للأخصائي') {
       alert('الرجاء كتابة تعليق أو تفاصيل الإجراء المتخذ.');
       return;
     }
@@ -291,15 +291,15 @@ const NewReferral: React.FC<NewReferralProps> = ({
                 />
               </div>
               <div className="flex flex-col md:flex-row flex-wrap gap-4">
-                {isHoD && initialData.status === ReferralStatus.PENDING_HOD && (
+                {isHoD && (initialData.status === ReferralStatus.PENDING_HOD || initialData.status === ReferralStatus.RETURNED_TO_HOD) && (
                   <>
                     <button onClick={() => handleAction(ReferralStatus.RESOLVED, 'تم حل المشكلة من قبل رئيس القسم', 'hod')} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 flex-1"><CheckCircle size={18} /> حل وإغلاق</button>
                     <button onClick={() => handleAction(ReferralStatus.PENDING_COUNSELOR, 'تحويل للمرشد التدريبي', 'hod')} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 flex-1"><ArrowLeft size={18} /> تحويل للمرشد</button>
+                    <button onClick={() => handleAction(ReferralStatus.SENT_TO_SPECIALIST, 'تحويل للأخصائي', 'hod')} className="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 flex items-center justify-center gap-2 flex-1"><UserCheck size={18} /> تحويل للأخصائي</button>
                   </>
                 )}
                 {isHoD && initialData.status === ReferralStatus.RETURNED_TO_HOD && (
                   <>
-                    <button onClick={() => handleAction(ReferralStatus.RESOLVED, 'اعتماد الحل وإغلاق', 'hod')} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 flex-1"><CheckCircle size={18} /> اعتماد الحل وإغلاق</button>
                     <button onClick={() => handleAction(ReferralStatus.TO_STUDENT_AFFAIRS, 'تحويل لشؤون المتدربين', 'hod')} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 flex-1"><AlertTriangle size={18} /> رفع لشؤون المتدربين</button>
                   </>
                 )}
@@ -311,6 +311,7 @@ const NewReferral: React.FC<NewReferralProps> = ({
                 )}
                 {initialData.status === ReferralStatus.RESOLVED && (<p className="text-green-700 font-bold flex items-center gap-2"><CheckCircle/> هذه الإحالة مكتملة.</p>)}
                 {initialData.status === ReferralStatus.TO_STUDENT_AFFAIRS && (<p className="text-red-700 font-bold flex items-center gap-2"><AlertTriangle/> هذه الإحالة محالة لشؤون المتدربين.</p>)}
+                {initialData.status === ReferralStatus.SENT_TO_SPECIALIST && (<p className="text-cyan-700 font-bold flex items-center gap-2"><UserCheck/> هذه الإحالة محالة للأخصائي للمتابعة.</p>)}
               </div>
             </div>
           </>
