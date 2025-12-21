@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { Staff, UserRole } from '../types';
 import { UserPlus, RefreshCw, Trash2, ShieldCheck, Search, Send } from 'lucide-react';
 import { db } from '../services/firebase';
-import { doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 interface StaffManagementProps {
   staff: Staff[];

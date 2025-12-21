@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import MobileNav from './components/MobileNav';
@@ -6,17 +5,18 @@ import Dashboard from './pages/Dashboard';
 import NewReferral from './pages/NewReferral';
 import ReferralsList from './pages/ReferralsList';
 import StaffManagement from './pages/StaffManagement';
+import DataImport from './pages/DataImport';
 import Profile from './pages/Profile';
-import { Referral, Trainee, Staff, UserRole, ReferralStatus } from './types';
-import { UserCircle2, Lock, ChevronDown, Bell, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Referral, Staff, UserRole, ReferralStatus, Trainee } from './types';
+import { ShieldCheck, Lock, User, Bell, Loader2, LogIn, ChevronLeft, Code2 } from 'lucide-react';
 import { db } from './services/firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { sendTelegramNotification, formatReferralMessage } from './services/telegramService';
 
 const INITIAL_STAFF: Staff[] = [
-  { id: 'hod1', name: 'م. عبدالله الزهراني', username: 'م. عبدالله الزهراني', password: '0558882711', role: UserRole.HOD, specialization: 'محركات ومركبات' },
-  { id: 'hod2', name: 'م. ياسر الشربي', username: 'م. ياسر الشربي', password: '0505709078', role: UserRole.HOD, specialization: 'تصنيع' },
-  { id: 'counselor1', name: 'ماجد ابراهيم المرزوقي', username: 'ماجد ابراهيم المرزوقي', password: '1234', role: UserRole.TRAINER, specialization: 'توجيه وإرشاد', isCounselor: true },
+  { id: 'hod1', name: 'م. عبدالله الزهراني', username: 'م. عبدالله الزهراني', password: '123', role: UserRole.HOD, specialization: 'محركات ومركبات' },
+  { id: 'hod2', name: 'م. ياسر الشربي', username: 'م. ياسر الشربي', password: '123', role: UserRole.HOD, specialization: 'تصنيع' },
+  { id: 'counselor1', name: 'ماجد ابراهيم المرزوقي', username: 'ماجد ابراهيم المرزوقي', password: '123', role: UserRole.TRAINER, specialization: 'توجيه وإرشاد', isCounselor: true },
 ];
 
 const App: React.FC = () => {
@@ -25,122 +25,66 @@ const App: React.FC = () => {
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [showNotifications, setShowNotifications] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [activePage, setActivePage] = useState('dashboard');
-  const [trainees, setTrainees] = useState<Trainee[]>([]); 
   const [staff, setStaff] = useState<Staff[]>([]);
   const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [trainees, setTrainees] = useState<Trainee[]>([]);
   const [editingReferral, setEditingReferral] = useState<Referral | undefined>(undefined);
 
+  // جلب بيانات الموظفين
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  useEffect(() => {
-    const staffRef = collection(db, 'staff');
-    const unsubscribe = onSnapshot(staffRef, async (snapshot) => {
-      if (snapshot.empty && navigator.onLine) {
-        for (const s of INITIAL_STAFF) {
-          await setDoc(doc(db, 'staff', s.id), s);
+    let unsubscribe = () => {};
+    try {
+      const staffRef = collection(db, 'staff');
+      unsubscribe = onSnapshot(staffRef, async (snapshot) => {
+        if (snapshot.empty && navigator.onLine) {
+          for (const s of INITIAL_STAFF) { 
+            await setDoc(doc(db, 'staff', s.id), s); 
+          }
+        } else {
+          const staffData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Staff));
+          staffData.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+          setStaff(staffData);
+          setIsLoading(false);
         }
-      } else {
-        const staffData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Staff));
-        staffData.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-        setStaff(staffData);
+      }, (err) => { 
+        console.error("Firestore Error (Staff):", err);
+        if (staff.length === 0) setStaff(INITIAL_STAFF);
         setIsLoading(false);
-        // Sync current user if updated
-        if (currentUser) {
-          const updatedSelf = staffData.find(s => s.id === currentUser.id);
-          if (updatedSelf) setCurrentUser(updatedSelf);
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const q = query(collection(db, 'referrals'), orderBy('date', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const referralData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Referral));
-      setReferrals(referralData);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const pendingReferrals = useMemo(() => {
-    if (!currentUser) return [];
-    let filtered: Referral[] = [];
-    if (currentUser.role === UserRole.HOD) {
-      filtered = referrals.filter(r => 
-        (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD || r.status === ReferralStatus.PENDING_COUNSELOR) &&
-        (r.specialization === currentUser.specialization || r.status === ReferralStatus.PENDING_COUNSELOR)
-      );
-    } else if (currentUser.isCounselor || currentUser.role === UserRole.COUNSELOR) {
-      filtered = referrals.filter(r => r.status === ReferralStatus.PENDING_COUNSELOR);
-    }
-    return filtered;
-  }, [referrals, currentUser]);
-
-  const notificationCount = pendingReferrals.length;
-
-  const handleUpdateReferral = async (referral: Referral) => {
-    try {
-      await setDoc(doc(db, 'referrals', referral.id), referral);
-      
-      // Handle Telegram Notifications
-      const lastEvent = referral.timeline[referral.timeline.length - 1];
-      let targetStaff: Staff[] = [];
-
-      if (referral.status === ReferralStatus.PENDING_HOD || referral.status === ReferralStatus.RETURNED_TO_HOD) {
-        // Find HOD of the specialization
-        targetStaff = staff.filter(s => s.role === UserRole.HOD && s.specialization === referral.specialization);
-      } else if (referral.status === ReferralStatus.PENDING_COUNSELOR) {
-        // Find all Counselors
-        targetStaff = staff.filter(s => s.isCounselor || s.role === UserRole.COUNSELOR);
-      }
-
-      const notificationBody = formatReferralMessage(
-        lastEvent.action,
-        referral.traineeName,
-        referral.status,
-        currentUser?.name || 'النظام',
-        lastEvent.comment
-      );
-
-      targetStaff.forEach(s => {
-        if (s.telegramChatId) {
-          sendTelegramNotification(s.telegramChatId, notificationBody);
-        }
       });
-
-      setEditingReferral(undefined);
-      setActivePage('referrals');
     } catch (e) {
-      console.error("Error saving referral: ", e);
-      alert("حدث خطأ أثناء حفظ الإحالة. الرجاء التحقق من الاتصال.");
+      console.error("Firestore Setup Error (Staff):", e);
+      setStaff(INITIAL_STAFF);
+      setIsLoading(false);
     }
-  };
+    return () => unsubscribe();
+  }, []);
 
-  const handleUpdateProfile = async (updates: Partial<Staff>) => {
-    if (!currentUser) return;
+  // جلب الإحالات
+  useEffect(() => {
+    let unsubscribe = () => {};
     try {
-      const userRef = doc(db, 'staff', currentUser.id);
-      await updateDoc(userRef, updates);
-      setCurrentUser({ ...currentUser, ...updates });
+      const q = query(collection(db, 'referrals'), orderBy('date', 'desc'));
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        setReferrals(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Referral)));
+      }, (err) => console.warn("Firestore Error (Referrals):", err));
     } catch (e) {
-      console.error("Error updating profile: ", e);
-      alert('حدث خطأ أثناء التحديث');
+      console.error("Firestore Setup Error (Referrals):", e);
     }
-  };
+    return () => unsubscribe();
+  }, []);
+
+  const pendingCount = useMemo(() => {
+    if (!currentUser) return 0;
+    return referrals.filter(r => {
+      if (currentUser.role === UserRole.HOD) {
+        return (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) && r.specialization === currentUser.specialization;
+      }
+      if (currentUser.isCounselor) return r.status === ReferralStatus.PENDING_COUNSELOR;
+      return false;
+    }).length;
+  }, [referrals, currentUser]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,92 +92,191 @@ const App: React.FC = () => {
     if (user) {
       setCurrentUser(user);
       setIsAuthenticated(true);
-      setLoginError('');
       setActivePage(user.role === UserRole.HOD || user.isCounselor ? 'dashboard' : 'new-referral');
     } else {
-      setLoginError('كلمة المرور غير صحيحة');
+      setLoginError('بيانات الدخول غير صحيحة');
     }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-    setLoginUser('');
-    setLoginPass('');
-    setShowNotifications(false);
+  const triggerNotifications = async (r: Referral) => {
+    if (!currentUser || !staff.length) return;
+    const lastEvent = r.timeline[r.timeline.length - 1];
+    const msg = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
+    let targetRecipients: Staff[] = [];
+    if (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) {
+      targetRecipients = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
+    } else if (r.status === ReferralStatus.PENDING_COUNSELOR) {
+      targetRecipients = staff.filter(s => s.isCounselor);
+    } else if (r.status === ReferralStatus.RESOLVED) {
+      targetRecipients = staff.filter(s => s.id === r.trainerId);
+    }
+    const recipientsWithChatId = targetRecipients.filter(s => !!s.telegramChatId);
+    for (const recipient of recipientsWithChatId) {
+      if (recipient.telegramChatId) {
+        await sendTelegramNotification(recipient.telegramChatId, msg);
+      }
+    }
   };
-
-  const effectiveRole = currentUser?.isCounselor ? UserRole.COUNSELOR : (currentUser?.role || UserRole.TRAINER);
 
   const renderContent = () => {
     if (!currentUser) return null;
+    const commonProps = { currentUser, staff, referrals };
     switch (activePage) {
       case 'dashboard': return <Dashboard referrals={referrals} />;
-      case 'new-referral':
-        return <NewReferral trainees={trainees} staff={staff} currentUser={currentUser} onSubmit={handleUpdateReferral}
-            onCancel={() => { setEditingReferral(undefined); setActivePage(effectiveRole === UserRole.TRAINER ? 'referrals' : 'dashboard'); }}
-            initialData={editingReferral} />;
-      case 'referrals':
-        return <ReferralsList referrals={referrals} onEdit={(r) => { setEditingReferral(r); setActivePage('new-referral'); }} currentUser={currentUser} onDelete={async (id) => await deleteDoc(doc(db, 'referrals', id))} />;
-      case 'staff':
-        return <StaffManagement staff={staff} setStaff={async (newStaff) => {}} currentUserSpecialization={currentUser.specialization} />;
-      case 'profile': return <Profile currentUser={currentUser} updateUserPassword={(p) => handleUpdateProfile({password: p})} onUpdateTelegram={(cid) => handleUpdateProfile({telegramChatId: cid})} />;
+      case 'new-referral': 
+        return <NewReferral {...commonProps} trainees={trainees} 
+          onSubmit={async (r) => { 
+            await setDoc(doc(db, 'referrals', r.id), r); 
+            try { await triggerNotifications(r); } catch (e) {}
+            setEditingReferral(undefined);
+            setActivePage('referrals'); 
+          }} 
+          onCancel={() => {
+            setEditingReferral(undefined);
+            setActivePage('dashboard');
+          }} 
+          initialData={editingReferral} 
+        />;
+      case 'referrals': 
+        return <ReferralsList referrals={referrals} currentUser={currentUser} 
+          onEdit={(r) => { setEditingReferral(r); setActivePage('new-referral'); }} 
+          onDelete={async (id) => await deleteDoc(doc(db, 'referrals', id))} />;
+      case 'staff': return <StaffManagement staff={staff} setStaff={() => {}} currentUserSpecialization={currentUser.specialization} />;
+      case 'import': return <DataImport trainees={trainees} setTrainees={setTrainees} staff={staff} setStaff={() => {}} />;
+      case 'profile': return <Profile currentUser={currentUser} updateUserPassword={async (p) => await updateDoc(doc(db, 'staff', currentUser.id), {password: p})} onUpdateTelegram={async (id) => await updateDoc(doc(db, 'staff', currentUser.id), {telegramChatId: id})} />;
       default: return <Dashboard referrals={referrals} />;
     }
   };
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center font-cairo p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-           <div className="text-center mb-8">
-             <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg"><Lock className="text-white" size={32} /></div>
-             <h1 className="text-xl font-bold text-gray-800">نظام إحالة المتدربين</h1>
-           </div>
-           {isLoading ? <div className="flex justify-center"><Loader2 className="animate-spin text-blue-600" /></div> : (
-             <form onSubmit={handleLogin} className="space-y-6">
-               <select value={loginUser} onChange={(e) => setLoginUser(e.target.value)} className="w-full p-3 border rounded-lg appearance-none bg-white">
-                 <option value="">اختر الاسم من القائمة...</option>
-                 {staff.map(s => <option key={s.id} value={s.username}>{s.name}</option>)}
-               </select>
-               <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} className="w-full p-3 border rounded-lg" placeholder="كلمة المرور" />
-               {loginError && <div className="text-red-500 text-sm text-center">{loginError}</div>}
-               <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">دخول</button>
-             </form>
-           )}
+      <div className="min-h-screen login-bg flex flex-col items-center justify-center p-6 font-cairo">
+        <div className="glass-card p-10 rounded-[2.5rem] w-full max-w-md fade-in-up">
+          <div className="text-center mb-10">
+            <div className="w-24 h-24 bg-blue-600/10 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner ring-4 ring-white/50">
+              <ShieldCheck className="text-blue-500" size={52} />
+            </div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">نظام الإحالة الرقمي</h1>
+            <p className="text-slate-500 mt-2 font-bold text-sm">الكلية التقنية بالطائف - التقنية الميكانيكية</p>
+          </div>
+          
+          {isLoading ? (
+            <div className="flex flex-col items-center py-10">
+              <Loader2 className="animate-spin text-blue-600 mb-4" size={40} />
+              <p className="text-slate-400 font-bold text-center">جاري الاتصال بقاعدة البيانات السحابية...</p>
+            </div>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-700 flex items-center gap-2 pr-1">
+                  <User size={16} className="text-blue-500" /> اختر هويتك الوظيفية
+                </label>
+                <div className="relative">
+                  <select 
+                    value={loginUser} 
+                    onChange={(e) => setLoginUser(e.target.value)} 
+                    className="w-full p-4 bg-white/50 border-2 border-slate-100 rounded-2xl appearance-none focus:border-blue-500 focus:bg-white outline-none text-sm transition-all font-bold text-slate-800 shadow-sm"
+                    required
+                  >
+                    <option value="">اختر اسمك...</option>
+                    {staff.map(s => (
+                      <option key={s.id} value={s.username}>
+                        {s.name} ({s.isCounselor ? 'مرشد' : s.role})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <ChevronLeft size={20} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-700 flex items-center gap-2 pr-1">
+                  <Lock size={16} className="text-blue-500" /> كلمة المرور
+                </label>
+                <input 
+                  type="password" 
+                  value={loginPass} 
+                  onChange={(e) => setLoginPass(e.target.value)} 
+                  className="w-full p-4 bg-white/50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 focus:bg-white outline-none transition-all font-mono tracking-widest text-center text-lg shadow-sm"
+                  placeholder="••••"
+                  required
+                />
+              </div>
+
+              {loginError && <div className="p-4 bg-red-50 text-red-600 text-xs font-black rounded-2xl text-center border border-red-100 animate-pulse">{loginError}</div>}
+
+              <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 flex items-center justify-center gap-3 group active:scale-[0.98]">
+                <LogIn size={22} className="group-hover:-translate-x-1 transition-transform" />
+                دخول آمن للنظام
+              </button>
+            </form>
+          )}
+          <div className="mt-12 text-center flex flex-col items-center gap-2">
+             <div className="flex items-center gap-2 text-slate-400 bg-slate-100 px-4 py-2 rounded-full border border-slate-200 shadow-inner">
+                <Code2 size={14} />
+                <span className="text-[11px] font-black uppercase tracking-widest">تطوير: م. عبدالله الزهراني</span>
+             </div>
+          </div>
         </div>
       </div>
     );
   }
 
+  const effectiveRole = currentUser?.isCounselor ? UserRole.COUNSELOR : (currentUser?.role || UserRole.TRAINER);
+
   return (
-    <div className="flex min-h-screen bg-gray-50 font-cairo">
-      <Sidebar activePage={activePage} setActivePage={(page) => { if(page === 'new-referral') setEditingReferral(undefined); setActivePage(page); }} 
-        currentUserRole={effectiveRole} onLogout={handleLogout} notificationCount={notificationCount} />
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto pb-24 flex flex-col w-full max-w-full">
-        <header className="mb-6 flex justify-between items-center">
-           <div>
-             <h1 className="text-xl font-bold text-gray-800">
-               {activePage === 'dashboard' ? 'لوحة المعلومات' : activePage === 'new-referral' ? 'إحالة جديدة' : activePage === 'referrals' ? 'سجل الإحالات' : activePage === 'staff' ? 'إدارة المدربين' : 'الملف الشخصي'}
-             </h1>
-           </div>
+    <div className="flex min-h-screen bg-[#F8FAFC] font-cairo overflow-hidden">
+      <Sidebar 
+        activePage={activePage} 
+        setActivePage={(p) => { 
+          if(p !== 'new-referral') setEditingReferral(undefined);
+          setActivePage(p); 
+        }} 
+        currentUserRole={effectiveRole} 
+        onLogout={() => setIsAuthenticated(false)} 
+        notificationCount={pendingCount} 
+      />
+      <main className="flex-1 p-4 md:p-10 overflow-y-auto pb-28 relative">
+        <header className="mb-10 flex justify-between items-center no-print">
            <div className="flex items-center gap-4">
-              <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2 bg-white rounded-xl shadow-sm border text-gray-600">
-                <Bell size={24} />
-                {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{notificationCount}</span>}
+             <div>
+               <h1 className="text-2xl font-black text-slate-900 tracking-tight capitalize">
+                 {activePage.replace('-', ' ')}
+               </h1>
+               <div className="flex items-center gap-2 mt-1">
+                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                 <p className="text-slate-400 text-xs font-bold">{currentUser?.name}</p>
+               </div>
+             </div>
+           </div>
+           
+           <div className="flex items-center gap-4">
+              <button className="relative p-3 bg-white rounded-2xl shadow-sm border border-slate-100 text-slate-600 hover:text-blue-600 transition-all">
+                <Bell size={22} />
+                {pendingCount > 0 && <span className="absolute top-2.5 right-2.5 bg-red-500 w-2.5 h-2.5 rounded-full border-2 border-white"></span>}
               </button>
-              <div className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border px-3 cursor-pointer" onClick={() => setActivePage('profile')}>
-                <UserCircle2 className="text-blue-600" />
-                <div className="text-sm hidden md:block text-right">
-                  <p className="font-bold text-gray-800">{currentUser?.name}</p>
-                  <p className="text-xs text-gray-500">{effectiveRole}</p>
+              
+              <div 
+                className="flex items-center gap-3 bg-white p-2 pr-4 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:border-blue-200 transition-all group" 
+                onClick={() => setActivePage('profile')}
+              >
+                <div className="text-left hidden md:block">
+                  <p className="font-black text-slate-800 text-sm leading-none">{currentUser?.name}</p>
+                </div>
+                <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white">
+                  <User size={22} />
                 </div>
               </div>
            </div>
         </header>
-        {renderContent()}
+        
+        <div className="fade-in-up">
+          {renderContent()}
+        </div>
       </main>
-      <MobileNav activePage={activePage} setActivePage={(page) => { if(page === 'new-referral') setEditingReferral(undefined); setActivePage(page); }} currentUserRole={effectiveRole} notificationCount={notificationCount} onLogout={handleLogout} />
+      <MobileNav activePage={activePage} setActivePage={setActivePage} currentUserRole={effectiveRole} notificationCount={pendingCount} onLogout={() => setIsAuthenticated(false)} />
     </div>
   );
 };

@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { LayoutDashboard, FilePlus, FolderOpen, Users, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, FilePlus, FolderOpen, Users, Settings, LogOut, ChevronRight, Code2, Database } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface SidebarProps {
@@ -15,7 +16,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, currentUse
   const getLabelForReferrals = () => {
     switch (currentUserRole) {
       case UserRole.TRAINER: return 'حالاتي المرفوعة';
-      case UserRole.COUNSELOR: return 'مهامي (الحالات)';
+      case UserRole.COUNSELOR: return 'صندوق الوارد';
       default: return 'سجل الإحالات';
     }
   };
@@ -23,69 +24,80 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, currentUse
   const menuItems = [
     { 
       id: 'dashboard', 
-      label: 'لوحة المعلومات', 
-      icon: <LayoutDashboard size={20} />, 
+      label: 'الرئيسية', 
+      icon: <LayoutDashboard size={22} />, 
       visible: currentUserRole === UserRole.HOD || currentUserRole === UserRole.COUNSELOR 
     },
-    // Updated: Visible to everyone now
-    { id: 'new-referral', label: 'إحالة جديدة', icon: <FilePlus size={20} />, visible: true }, 
+    { id: 'new-referral', label: 'إحالة جديدة', icon: <FilePlus size={22} />, visible: true }, 
     { 
       id: 'referrals', 
       label: getLabelForReferrals(), 
-      icon: <FolderOpen size={20} />, 
+      icon: <FolderOpen size={22} />, 
       visible: true,
       badge: notificationCount > 0 ? notificationCount : undefined
     },
-    { id: 'staff', label: 'إدارة المدربين', icon: <Users size={20} />, visible: currentUserRole === UserRole.HOD },
-    { id: 'profile', label: 'الإعدادات', icon: <Settings size={20} />, visible: true },
+    { id: 'import', label: 'استيراد البيانات', icon: <Database size={22} />, visible: currentUserRole === UserRole.HOD },
+    { id: 'staff', label: 'إدارة المدربين', icon: <Users size={22} />, visible: currentUserRole === UserRole.HOD },
+    { id: 'profile', label: 'الإعدادات', icon: <Settings size={22} />, visible: true },
   ];
 
   return (
-    <div className="w-64 bg-slate-800 text-white min-h-screen flex flex-col shadow-lg hidden md:flex no-print">
-      <div className="p-6 border-b border-slate-700 flex items-center justify-center">
-        <div className="text-2xl font-bold text-center">
-          <span className="text-blue-400">نِظام</span> إحالة
+    <div className="w-72 bg-slate-900 text-white min-h-screen flex flex-col shadow-2xl hidden md:flex no-print border-l border-white/5 relative">
+      <div className="p-10 border-b border-white/5 flex flex-col items-center">
+        <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-600/30">
+          <span className="text-2xl font-black">N</span>
         </div>
+        <div className="text-xl font-black text-center tracking-tight">
+          نظام <span className="text-blue-500 italic">الإحالة</span>
+        </div>
+        <div className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-widest opacity-60">Digital Control Panel</div>
       </div>
       
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-6 space-y-3">
         {menuItems.filter(item => item.visible).map((item) => (
           <button
             key={item.id}
             onClick={() => setActivePage(item.id)}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${
+            className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl transition-all duration-300 group ${
               activePage === item.id
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20 translate-x-1'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <div className="flex items-center space-x-3 space-x-reverse">
-              {item.icon}
-              <span className="font-medium">{item.label}</span>
+            <div className="flex items-center gap-4">
+              <span className={`${activePage === item.id ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'} transition-colors`}>
+                {item.icon}
+              </span>
+              <span className="font-bold text-[14px]">{item.label}</span>
             </div>
-            {item.badge && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+            {item.badge ? (
+              <span className="bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md animate-pulse">
                 {item.badge}
               </span>
+            ) : (
+              activePage === item.id && <ChevronRight size={16} className="opacity-40" />
             )}
           </button>
         ))}
       </nav>
 
-      <div className="p-4 border-t border-slate-700">
+      <div className="p-8 border-t border-white/5 bg-slate-950/30">
         <button 
           onClick={onLogout}
-          className="w-full flex items-center space-x-3 space-x-reverse px-4 py-2 text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
+          className="w-full flex items-center gap-4 px-5 py-4 text-red-400 hover:bg-red-400/10 rounded-2xl transition-all font-black text-sm active:scale-95"
         >
-          <LogOut size={18} />
-          <span>تسجيل خروج</span>
+          <LogOut size={20} />
+          <span>خروج آمن</span>
         </button>
-        <div className="mt-6 text-xs text-slate-500 text-center leading-relaxed">
-          الكلية التقنية بالطائف
-          <br/>
-          قسم التقنية الميكانيكية
-          <br/>
-          <span className="text-blue-400 mt-2 block">تطوير م. عبدالله الزهراني</span>
+        
+        <div className="mt-8 pt-8 border-t border-white/5 text-center space-y-3">
+          <div className="flex flex-col items-center gap-2 bg-slate-800/50 py-3 px-2 rounded-2xl border border-white/5">
+             <Code2 size={16} className="text-blue-400" />
+             <span className="text-[11px] font-black text-slate-300 tracking-tight">تطوير: م. عبدالله الزهراني</span>
+          </div>
+          <div className="text-[9px] text-slate-600 font-bold uppercase tracking-widest leading-relaxed">
+            الكلية التقنية بالطائف © 2025
+          </div>
         </div>
       </div>
     </div>

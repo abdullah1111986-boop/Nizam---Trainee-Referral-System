@@ -1,7 +1,10 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { CaseType, Repetition } from "../types";
 
+/**
+ * يحلل تفاصيل الحالة باستخدام ذكاء Gemini الاصطناعي ويقترح إجراءات تربوية.
+ */
 export const analyzeCaseWithGemini = async (
   caseDetails: string,
   caseTypes: CaseType[],
@@ -9,37 +12,37 @@ export const analyzeCaseWithGemini = async (
   previousActions: string
 ): Promise<string> => {
   try {
-    // الحصول على مفتاح الـ API بشكل آمن عند الحاجة فقط
-    const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) || "";
+    // إنشاء عميل جديد عند الحاجة لضمان استخدام أحدث مفتاح API من البيئة
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    if (!apiKey) {
-      console.warn("Gemini API Key is missing.");
-      return "عذراً، ميزة تحليل الذكاء الاصطناعي غير متاحة حالياً لعدم توفر مفتاح التشغيل.";
-    }
+    const systemInstruction = `أنت مستشار تربوي خبير في المؤسسة العامة للتدريب التقني والمهني بالسعودية. 
+حلل الحالة التدريبية التالية وقدم توصية مهنية محددة للمرشد التدريبي. 
+اجعل التوصية عملية، إجرائية، ومختصرة (لا تزيد عن 80 كلمة).`;
 
-    const ai = new GoogleGenAI({ apiKey });
-    
     const prompt = `
-      بصفتك مستشاراً تربوياً وتدريبياً خبيراً، قم بتحليل حالة المتدرب التالية واقترح حلولاً عملية ومهنية للمرشد الطلابي.
-      
-      بيانات الحالة:
-      - نوع المشكلة: ${caseTypes.join(', ')}
-      - تكرار المشكلة: ${repetition}
-      - تفاصيل الحالة: ${caseDetails}
-      - الإجراءات السابقة التي اتخذها المدرب: ${previousActions}
+الحالة التدريبية للمتدرب:
+- تصنيف المشكلة: ${caseTypes.join('، ')}
+- مدى التكرار: ${repetition}
+- تفاصيل المشكلة: ${caseDetails}
+- ما تم اتخاذه من قبل المدرب: ${previousActions || 'لا توجد إجراءات سابقة'}
 
-      المطلوب:
-      قدم توصية موجزة ومهنية (لا تتجاوز 100 كلمة) تتضمن خطوات إجرائية يمكن للمرشد التدريبي اتخاذها لحل هذه المشكلة وتعديل سلوك المتدرب أو تحسين مستواه.
-    `;
+المطلوب: تقديم خطة عمل فورية للمرشد.`;
 
-    const response = await ai.models.generateContent({
+    // استخدام gemini-3-pro-preview للمهام التحليلية المعقدة
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        // يمكن تعطيل التفكير العميق لسرعة الاستجابة في هذا السياق
+        thinkingConfig: { thinkingBudget: 0 }
+      }
     });
 
-    return response.text || "لم يتم إنشاء تحليل.";
+    // الوصول المباشر لخاصية text كما هو محدد في إرشادات SDK
+    return response.text || "لم نتمكن من تحليل الحالة حالياً.";
   } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    return "حدث خطأ أثناء تحليل الحالة بواسطة الذكاء الاصطناعي.";
+    console.error("Gemini Error:", error);
+    return "نعتذر، حدث خطأ أثناء الاتصال بالذكاء الاصطناعي للتحليل.";
   }
 };

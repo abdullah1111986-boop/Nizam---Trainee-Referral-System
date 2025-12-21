@@ -1,6 +1,10 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAnalytics, isSupported } from 'firebase/analytics';
 
+/**
+ * إعدادات مشروع Firebase
+ */
 const firebaseConfig = {
   apiKey: "AIzaSyC019dSsE2ElPDRPDyccVabYJLm7pWOM3U",
   authDomain: "nizam-traineereferralsys-2518b.firebaseapp.com",
@@ -11,5 +15,17 @@ const firebaseConfig = {
   measurementId: "G-JCY1QLJRBC"
 };
 
-const app = initializeApp(firebaseConfig);
+// تهيئة تطبيق Firebase
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+/**
+ * تصدير نسخة Firestore
+ */
 export const db = getFirestore(app);
+
+/**
+ * تهيئة التحليلات
+ */
+export const analytics = typeof window !== 'undefined'
+  ? isSupported().then((supported) => (supported ? getAnalytics(app) : null))
+  : Promise.resolve(null);
