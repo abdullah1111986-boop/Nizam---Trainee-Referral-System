@@ -24,7 +24,7 @@ export enum UserRole {
 export enum ReferralStatus {
   PENDING_HOD = 'بانتظار رئيس القسم',
   PENDING_COUNSELOR = 'بانتظار المرشد',
-  RETURNED_TO_HOD = 'عاد لرئيس القسم',
+  RETURNED_TO_HOD = 'مراجعة رد المرشد',
   RESOLVED = 'تم الحل',
   TO_STUDENT_AFFAIRS = 'محال لشؤون المتدربين',
   SENT_TO_SPECIALIST = 'محال للأخصائي'
@@ -55,7 +55,7 @@ export interface Staff {
   role: UserRole;
   specialization?: string; 
   isCounselor?: boolean; 
-  telegramChatId?: string; // Added for notifications
+  telegramChatId?: string;
 }
 
 export interface Referral {
