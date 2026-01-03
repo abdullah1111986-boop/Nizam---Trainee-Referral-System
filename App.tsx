@@ -62,7 +62,20 @@ const App: React.FC = () => {
           }
         } else {
           const staffData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Staff));
-          staffData.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+          
+          // ترتيب الموظفين: رؤساء الأقسام أولاً، ثم المدربين، مع ترتيب أبجدي داخلي
+          staffData.sort((a, b) => {
+            // التحقق من دور رئيس القسم (HOD)
+            const isAHod = a.role === UserRole.HOD;
+            const isBHod = b.role === UserRole.HOD;
+
+            if (isAHod && !isBHod) return -1;
+            if (!isAHod && isBHod) return 1;
+
+            // إذا كان كلاهما بنفس الرتبة، نرتب أبجدياً بالاسم
+            return a.name.localeCompare(b.name, 'ar');
+          });
+          
           setStaff(staffData);
           setIsLoading(false);
         }
