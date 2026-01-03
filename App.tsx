@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import MobileNav from './components/MobileNav';
@@ -106,8 +105,6 @@ const App: React.FC = () => {
     }).length;
   }, [referrals, currentUser]);
 
-  // Fix: Defined effectiveRole to resolve reference errors in Sidebar and MobileNav components.
-  // This calculates the visual role based on whether a trainer is also a counselor.
   const effectiveRole = useMemo(() => {
     if (!currentUser) return UserRole.TRAINER;
     if (currentUser.role === UserRole.HOD) return UserRole.HOD;
@@ -135,7 +132,6 @@ const App: React.FC = () => {
       setIsAuthenticated(true);
       setActivePage(user.role === UserRole.HOD || user.isCounselor ? 'dashboard' : 'new-referral');
       
-      // التأكد من طلب الإذن عند الدخول
       if ("Notification" in window) {
         Notification.requestPermission();
       }
@@ -147,13 +143,12 @@ const App: React.FC = () => {
 
   const triggerNotifications = async (r: Referral) => {
     if (!currentUser || !staff.length) return;
-    const allowedStatuses = [ReferralStatus.PENDING_HOD, ReferralStatus.PENDING_COUNSELOR];
-    if (!allowedStatuses.includes(r.status)) return;
-
+    
+    // إرسال الإشعارات في جميع الحالات المهمة
     const lastEvent = r.timeline[r.timeline.length - 1];
     const msg = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
     
-    // إرسال إشعار المتصفح المحلى
+    // إشعار المتصفح
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("تنبيه نظام الإحالة", {
         body: `${lastEvent.action}: للمتدرب ${r.traineeName}`,
@@ -162,14 +157,26 @@ const App: React.FC = () => {
       });
     }
 
+    // تحديد المستقبلين للتيليجرام
     let recipientsToNotify: Staff[] = [];
+    
+    // 1. دائماً نبلغ المدرب الأصلي الذي رفع الحالة بأي تحديث
     const originalTrainer = staff.find(s => s.id === r.trainerId);
     if (originalTrainer) recipientsToNotify.push(originalTrainer);
-    const HODs = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
-    recipientsToNotify.push(...HODs);
-    const counselors = staff.filter(s => s.isCounselor);
-    recipientsToNotify.push(...counselors);
+    
+    // 2. إذا كانت الحالة بانتظار رئيس القسم، نبلغ رؤساء الأقسام في نفس التخصص
+    if (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) {
+      const HODs = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
+      recipientsToNotify.push(...HODs);
+    }
+    
+    // 3. إذا كانت محالة للمرشد، نبلغ جميع المرشدين
+    if (r.status === ReferralStatus.PENDING_COUNSELOR) {
+      const counselors = staff.filter(s => s.isCounselor);
+      recipientsToNotify.push(...counselors);
+    }
 
+    // فلترة المكرر والتأكد من وجود Chat ID وعدم إرسال إشعار للشخص الذي قام بالفعل نفسه
     const uniqueRecipients = Array.from(new Set(recipientsToNotify.map(s => s.id)))
       .map(id => staff.find(s => s.id === id))
       .filter((s): s is Staff => !!s && !!s.telegramChatId && s.id !== currentUser.id);
