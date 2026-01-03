@@ -15,7 +15,6 @@ import { sendTelegramNotification, formatReferralMessage } from './services/tele
 
 /**
  * وظيفة أمنية لتوليد بصمة رقمية مشفرة لكلمة المرور (SHA-256)
- * تمنع تخزين كلمات المرور بنصوص واضحة في الكود أو قاعدة البيانات
  */
 export const hashPassword = async (password: string): Promise<string> => {
   const encoder = new TextEncoder();
@@ -25,7 +24,7 @@ export const hashPassword = async (password: string): Promise<string> => {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// بصمة مشفرة لكلمة المرور الافتراضية "123" (لأغراض التهيئة الأولى فقط)
+// بصمة مشفرة لكلمة المرور الافتراضية "123"
 const INITIAL_HASH = "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
 
 const INITIAL_STAFF: Staff[] = [
@@ -103,17 +102,39 @@ const App: React.FC = () => {
     e.preventDefault();
     setLoginError('');
     
-    // تشفير كلمة المرور المدخلة قبل المقارنة
     const inputHash = await hashPassword(loginPass);
-    const user = staff.find(s => s.username === loginUser && s.password === inputHash);
-    
-    if (user) {
+    const user = staff.find(s => s.username === loginUser);
+
+    if (!user) {
+      setLoginError('بيانات الدخول غير صحيحة');
+      return;
+    }
+
+    // 1. التحقق من البصمة المشفرة (النظام الجديد)
+    if (user.password === inputHash) {
       setCurrentUser(user);
       setIsAuthenticated(true);
       setActivePage(user.role === UserRole.HOD || user.isCounselor ? 'dashboard' : 'new-referral');
-    } else {
-      setLoginError('بيانات الدخول غير صحيحة');
+      return;
     }
+
+    // 2. التحقق من النص الواضح (النظام القديم - هجرة تلقائية)
+    if (user.password === loginPass) {
+      // تحديث كلمة المرور في قاعدة البيانات لتصبح مشفرة فوراً
+      try {
+        await updateDoc(doc(db, 'staff', user.id), { password: inputHash });
+        console.log(`Password for ${user.username} has been migrated to SHA-256.`);
+      } catch (err) {
+        console.error("Migration failed:", err);
+      }
+      
+      setCurrentUser({ ...user, password: inputHash });
+      setIsAuthenticated(true);
+      setActivePage(user.role === UserRole.HOD || user.isCounselor ? 'dashboard' : 'new-referral');
+      return;
+    }
+
+    setLoginError('بيانات الدخول غير صحيحة');
   };
 
   const triggerNotifications = async (r: Referral) => {
