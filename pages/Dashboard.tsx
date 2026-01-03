@@ -1,8 +1,7 @@
-
 import React, { useMemo } from 'react';
-import { Referral, ReferralStatus, CaseType } from '../types';
+import { Referral, ReferralStatus, CaseType, UserRole } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { Users, FileText, CheckCircle, AlertTriangle, TrendingUp, ArrowUpRight, Clock } from 'lucide-react';
+import { Users, FileText, CheckCircle, AlertTriangle, TrendingUp, ArrowUpRight, Clock, Lightbulb, MousePointer2, Smartphone } from 'lucide-react';
 
 interface DashboardProps {
   referrals: Referral[];
@@ -45,7 +44,35 @@ const Dashboard: React.FC<DashboardProps> = ({ referrals }) => {
   }, [referrals]);
 
   return (
-    <div className="space-y-10 no-print max-w-7xl mx-auto">
+    <div className="space-y-10 no-print max-w-7xl mx-auto font-cairo">
+      
+      {/* دليل المدرب السريع - المضافة حديثاً */}
+      <div className="bg-white border border-blue-100 rounded-[2.5rem] p-8 shadow-sm flex flex-col md:flex-row items-center gap-8">
+        <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-200">
+          <Lightbulb size={32} />
+        </div>
+        <div className="flex-1 text-center md:text-right">
+          <h3 className="text-lg font-black text-slate-900 mb-2">مرحباً بك في نظام الإحالة الرقمي</h3>
+          <p className="text-xs font-bold text-slate-500 leading-relaxed">
+            هذا التطبيق هو البديل الرقمي للنموذج الورقي (6). يمكنك الآن رفع حالات المتدربين، متابعة سيرها، والحصول على اقتراحات من الذكاء الاصطناعي لحل المشكلات بضغطة زر.
+          </p>
+        </div>
+        <div className="flex gap-4">
+           <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-w-[100px]">
+              <MousePointer2 size={20} className="text-blue-500" />
+              <span className="text-[10px] font-black text-slate-600 uppercase">رفع سهل</span>
+           </div>
+           <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-w-[100px]">
+              <Smartphone size={20} className="text-indigo-500" />
+              <span className="text-[10px] font-black text-slate-600 uppercase">تنبيهات فورية</span>
+           </div>
+           <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-w-[100px]">
+              <CheckCircle size={20} className="text-green-500" />
+              <span className="text-[10px] font-black text-slate-600 uppercase">متابعة دقيقة</span>
+           </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         <StatCard title="إجمالي الحالات" value={stats.total} icon={<FileText size={26} />} color="bg-blue-500" subtitle="حالات القسم المسجلة" />
         <StatCard title="تم الحل والإغلاق" value={stats.completed} icon={<CheckCircle size={26} />} color="bg-green-500" subtitle="معاملات منتهية" />
@@ -60,36 +87,22 @@ const Dashboard: React.FC<DashboardProps> = ({ referrals }) => {
               <h3 className="text-xl font-black text-slate-900">تحليل تصنيف المخالفات</h3>
               <p className="text-slate-400 text-xs mt-1 font-bold">إحصائيات توزيع الحالات حسب نوع المخالفة</p>
             </div>
-            <button className="text-blue-600 text-xs font-black flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-xl hover:bg-blue-100 transition-colors">
-              عرض التفاصيل <ArrowUpRight size={16}/>
-            </button>
           </div>
           <div className="h-[400px] w-full">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie 
-                    data={chartData} 
-                    cx="50%" 
-                    cy="50%" 
-                    innerRadius={80} 
-                    outerRadius={130} 
-                    paddingAngle={8} 
-                    dataKey="value" 
-                    animationDuration={1500}
-                  >
+                  <Pie data={chartData} cx="50%" cy="50%" innerRadius={80} outerRadius={130} paddingAngle={8} dataKey="value" animationDuration={1500}>
                     {chartData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', fontFamily: 'Cairo', fontWeight: 'bold' }} 
-                  />
+                  <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', fontFamily: 'Cairo', fontWeight: 'bold' }} />
                   <Legend layout="vertical" align="right" verticalAlign="middle" iconType="circle" wrapperStyle={{ fontFamily: 'Cairo', fontWeight: 'bold', fontSize: '13px' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
+              <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4 text-center">
                 <FileText size={64} className="opacity-10" />
-                <p className="font-bold">بانتظار تسجيل البيانات...</p>
+                <p className="font-bold">ابدأ برفع أول إحالة لتظهر الإحصائيات هنا</p>
               </div>
             )}
           </div>
@@ -108,8 +121,6 @@ const Dashboard: React.FC<DashboardProps> = ({ referrals }) => {
                   <p className="font-black text-slate-800 group-hover:text-blue-600 transition-colors text-sm">{r.traineeName}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{r.status}</span>
-                    <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">{new Date(r.date).toLocaleDateString('ar-EG')}</span>
                   </div>
                 </div>
               </div>

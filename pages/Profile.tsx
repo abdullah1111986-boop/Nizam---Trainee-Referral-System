@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Staff } from '../types';
-import { Lock, Save, Send, Loader2, CheckCircle, Info, ShieldAlert, MessageCircle, Hash, Smartphone, HelpCircle, Activity, ExternalLink } from 'lucide-react';
+import { Lock, Save, Send, Loader2, CheckCircle, Info, ShieldAlert, MessageCircle, Hash, Smartphone, HelpCircle, Activity, ExternalLink, BookOpen, MousePointer2 } from 'lucide-react';
 import { sendTelegramNotification, formatReferralMessage, checkBotStatus, TelegramResponse } from '../services/telegramService';
 
 interface ProfileProps {
@@ -17,15 +17,10 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
   const [botHealth, setBotHealth] = useState<{status: 'checking' | 'ok' | 'error', detail?: string}>({status: 'checking'});
 
   useEffect(() => {
-    // فحص حالة البوت بمجرد دخول الصفحة
     checkBotStatus().then(res => {
       if (res.success) setBotHealth({status: 'ok', detail: res.message});
       else setBotHealth({status: 'error', detail: res.description});
     });
-
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
   }, []);
 
   const handleTestTelegram = async () => {
@@ -35,16 +30,7 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
     }
     setIsTestingTelegram(true);
     setTeleFeedback(null);
-
-    const testMsg = formatReferralMessage(
-      'رسالة اختبار التشخيص', 
-      'متدرب تجريبي', 
-      'اختبار', 
-      currentUser.name, 
-      'هذه الرسالة لتأكيد نجاح الربط التقني.'
-    );
-    
-    const result = await sendTelegramNotification(telegramChatId, testMsg);
+    const result = await sendTelegramNotification(telegramChatId, formatReferralMessage('اختبار النظام', 'تجربة', 'نشط', currentUser.name, 'نجاح الربط!'));
     setTeleFeedback(result);
     setIsTestingTelegram(false);
   };
@@ -54,122 +40,147 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
     setIsSavingTelegram(true);
     try {
       await onUpdateTelegram(telegramChatId);
-      alert('تم حفظ البيانات بنجاح.');
+      alert('✅ تم حفظ المعرف بنجاح.');
     } catch (error) {
-      alert('فشل الاتصال بقاعدة البيانات.');
+      alert('❌ فشل الحفظ.');
     } finally {
       setIsSavingTelegram(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto mt-4 space-y-6 pb-24 px-4 font-cairo">
-      {/* حالة البوت - تشخيصي */}
-      <div className={`p-4 rounded-2xl flex items-center justify-between border ${botHealth.status === 'ok' ? 'bg-green-50 border-green-100 text-green-700' : botHealth.status === 'error' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
-        <div className="flex items-center gap-3">
-          <Activity size={18} className={botHealth.status === 'checking' ? 'animate-pulse' : ''} />
-          <span className="text-xs font-black">حالة اتصال البوت: {botHealth.status === 'checking' ? 'جاري الفحص...' : botHealth.status === 'ok' ? 'مستقر' : 'توجد مشكلة'}</span>
-        </div>
-        {botHealth.detail && <span className="text-[10px] opacity-70 font-bold">{botHealth.detail}</span>}
-      </div>
-
-      <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
-        <div className="bg-slate-900 p-6 text-white flex items-center justify-between">
-          <h3 className="font-black text-lg flex items-center gap-2">
-            <Smartphone size={24} /> ربط التيليجرام
-          </h3>
-          <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-[10px] bg-white/10 px-3 py-1 rounded-full flex items-center gap-1 hover:bg-white/20">
-            <ExternalLink size={12} /> معرفة الـ ID الخاص بي
-          </a>
-        </div>
-        
-        <div className="p-8 space-y-8">
-          <div className="relative group">
-            <label className="block text-xs font-black text-slate-400 mb-3 pr-2 uppercase tracking-widest">Telegram Chat ID (أرقام فقط)</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={telegramChatId}
-              onChange={(e) => setTelegramChatId(e.target.value.replace(/[^\d-]/g, ''))}
-              className="w-full p-6 bg-slate-50 border-2 border-slate-50 rounded-3xl focus:border-blue-500 focus:bg-white outline-none text-center text-4xl font-black text-slate-800 transition-all shadow-inner"
-              placeholder="مثلاً: 12345678"
-            />
-            {telegramChatId && !/^-?\d+$/.test(telegramChatId) && (
-              <p className="text-red-500 text-[10px] font-black mt-2 text-center">يرجى إدخال أرقام فقط (بدون حروف أو رموز @)</p>
-            )}
+    <div className="max-w-4xl mx-auto mt-4 space-y-8 pb-24 px-4 font-cairo">
+      
+      {/* قسم 1: الدليل التعليمي الشامل (هذا ما كان ينقص) */}
+      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2.5rem] p-1 shadow-2xl overflow-hidden">
+        <div className="bg-white/95 backdrop-blur-md rounded-[2.3rem] p-8">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+              <BookOpen size={24} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-slate-900">دليل إعداد الإشعارات الفورية</h2>
+              <p className="text-slate-500 text-sm font-bold">اتبع هذه الخطوات لمرة واحدة فقط لتصلك تنبيهات النظام</p>
+            </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
-              onClick={handleUpdateTelegram}
-              disabled={isSavingTelegram}
-              className="py-5 bg-slate-900 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 transition-all shadow-xl"
-            >
-              {isSavingTelegram ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-              حفظ المعرف
-            </button>
-            <button
-              onClick={handleTestTelegram}
-              disabled={isTestingTelegram || !telegramChatId}
-              className="py-5 bg-blue-600 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
-            >
-              {isTestingTelegram ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-              فحص الربط الآن
-            </button>
-          </div>
-          
-          {teleFeedback && (
-            <div className={`p-6 rounded-3xl border animate-fade-in ${teleFeedback.success ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
-              <div className="flex items-start gap-4">
-                <div className={`p-2 rounded-xl bg-white shadow-sm ${teleFeedback.success ? 'text-green-500' : 'text-red-500'}`}>
-                  {teleFeedback.success ? <CheckCircle size={24} /> : <ShieldAlert size={24} />}
-                </div>
-                <div className="flex-1">
-                  <p className={`font-black text-sm mb-1 ${teleFeedback.success ? 'text-green-800' : 'text-red-800'}`}>
-                    {teleFeedback.success ? 'تم الاتصال بنجاح!' : 'فشل التشخيص'}
-                  </p>
-                  <p className="text-xs font-bold text-slate-600 leading-relaxed">
-                    {teleFeedback.message || teleFeedback.description}
-                  </p>
-                  
-                  {!teleFeedback.success && teleFeedback.errorCode && (
-                    <div className="mt-3 pt-3 border-t border-red-200/50 flex flex-col gap-1">
-                      <span className="text-[10px] font-black text-red-400 uppercase">الرمز التقني: {teleFeedback.errorCode}</span>
-                      <span className="text-[10px] font-mono text-slate-400 break-all">{teleFeedback.description}</span>
-                    </div>
-                  )}
 
-                  {!teleFeedback.success && !teleFeedback.errorCode && (
-                    <div className="mt-4 p-3 bg-white/50 rounded-xl border border-red-100">
-                      <p className="text-[10px] text-red-700 font-black mb-2">💡 حلول مقترحة:</p>
-                      <ul className="text-[10px] text-slate-500 space-y-1 font-bold">
-                        <li>• افتح <a href={`https://t.me/ReferralSystemBot`} target="_blank" className="text-blue-600 underline">رابط البوت</a> واضغط Start.</li>
-                        <li>• تأكد من أن الـ ID لا يحتوي على مسافات.</li>
-                        <li>• إذا كنت تستخدم شبكة كلية، جرب استخدام بيانات الهاتف.</li>
-                      </ul>
-                    </div>
-                  )}
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+            {/* الخطوة 1 */}
+            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 relative group hover:bg-white hover:shadow-xl transition-all duration-500">
+              <span className="absolute -top-4 -right-4 w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-black shadow-lg">1</span>
+              <div className="mb-4 text-blue-600"><MessageCircle size={32} /></div>
+              <h4 className="font-black text-slate-800 mb-2">بدء البوت</h4>
+              <p className="text-xs font-bold text-slate-500 leading-relaxed mb-4">يجب أولاً تفعيل البوت لتتمكن من استقبال الرسائل منه.</p>
+              <a href="https://t.me/ReferralSystemBot" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-600 font-black text-[10px] bg-blue-50 px-3 py-2 rounded-xl w-fit hover:bg-blue-100 transition-colors">
+                فتح البوت @ReferralSystemBot <ExternalLink size={12} />
+              </a>
+            </div>
+
+            {/* الخطوة 2 */}
+            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 relative group hover:bg-white hover:shadow-xl transition-all duration-500">
+              <span className="absolute -top-4 -right-4 w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-black shadow-lg">2</span>
+              <div className="mb-4 text-indigo-600"><Hash size={32} /></div>
+              <h4 className="font-black text-slate-800 mb-2">استخراج معرفك</h4>
+              <p className="text-xs font-bold text-slate-500 leading-relaxed mb-4">تحتاج لتعريف النظام برقم حسابك في تيليجرام (Chat ID).</p>
+              <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-indigo-600 font-black text-[10px] bg-indigo-50 px-3 py-2 rounded-xl w-fit hover:bg-indigo-100 transition-colors">
+                احصل على الـ ID الخاص بك <ExternalLink size={12} />
+              </a>
+            </div>
+
+            {/* الخطوة 3 */}
+            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 relative group hover:bg-white hover:shadow-xl transition-all duration-500">
+              <span className="absolute -top-4 -right-4 w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-black shadow-lg">3</span>
+              <div className="mb-4 text-green-600"><Save size={32} /></div>
+              <h4 className="font-black text-slate-800 mb-2">الحفظ والاختبار</h4>
+              <p className="text-xs font-bold text-slate-500 leading-relaxed mb-4">ضع الرقم في الخانة بالأسفل واضغط حفظ ثم "فحص الربط".</p>
+              <div className="flex items-center gap-2 text-green-600 font-black text-[10px] bg-green-50 px-3 py-2 rounded-xl w-fit">
+                تمت المهمة بنجاح <CheckCircle size={12} />
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      <div className="bg-amber-50 p-8 rounded-[2rem] border border-amber-100 flex gap-4">
-          <Info className="text-amber-500 flex-shrink-0" size={24} />
-          <div className="text-[11px] font-bold text-amber-700 leading-relaxed">
-            ملاحظة: البوت لا يمكنه "البحث عنك". يجب أن تكون أنت من يبدأ المحادثة معه بإرسال أي رسالة، ثم سيتمكن النظام من التعرف عليك وإرسال الإشعارات.
-          </div>
-      </div>
+      {/* قسم 2: لوحة التحكم والربط */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-8">
+               <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                 <Smartphone size={24} className="text-blue-600" /> خانة الربط التقني
+               </h3>
+               <div className={`px-4 py-1.5 rounded-full text-[10px] font-black border ${botHealth.status === 'ok' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                 حالة البوت: {botHealth.status === 'ok' ? 'مستقر' : 'توجد مشكلة'}
+               </div>
+            </div>
+            
+            <div className="space-y-8">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={telegramChatId}
+                  onChange={(e) => setTelegramChatId(e.target.value.replace(/[^\d-]/g, ''))}
+                  className="w-full p-8 bg-slate-50 border-2 border-slate-50 rounded-[2rem] focus:border-blue-500 focus:bg-white outline-none text-center text-4xl font-black text-slate-800 transition-all"
+                  placeholder="000000000"
+                />
+                <p className="text-center text-[10px] font-black text-slate-400 mt-4 uppercase tracking-widest">أدخل الأرقام التي حصلت عليها من البوت</p>
+              </div>
 
-      <div className="text-center pt-4">
-        <button onClick={() => {
-          const p = prompt('أدخل كلمة المرور الجديدة:');
-          if (p) updateUserPassword(p).then(() => alert('تم التحديث'));
-        }} className="text-slate-400 text-xs font-black flex items-center justify-center gap-2 mx-auto hover:text-slate-600">
-          <Lock size={14} /> تغيير كلمة المرور
-        </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onClick={handleUpdateTelegram} disabled={isSavingTelegram} className="py-5 bg-slate-900 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 transition-all active:scale-95">
+                  {isSavingTelegram ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />} حفظ المعرف
+                </button>
+                <button onClick={handleTestTelegram} disabled={isTestingTelegram || !telegramChatId} className="py-5 bg-blue-600 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl hover:bg-blue-700 transition-all active:scale-95">
+                  {isTestingTelegram ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />} فحص الربط الآن
+                </button>
+              </div>
+            </div>
+
+            {teleFeedback && (
+              <div className={`mt-8 p-6 rounded-[2rem] border animate-fade-in ${teleFeedback.success ? 'bg-green-50 border-green-100 text-green-800' : 'bg-red-50 border-red-100 text-red-800'}`}>
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-white rounded-xl shadow-sm">
+                    {teleFeedback.success ? <CheckCircle className="text-green-500" /> : <ShieldAlert className="text-red-500" />}
+                  </div>
+                  <div>
+                    <h5 className="font-black text-sm mb-1">{teleFeedback.success ? 'تم الاتصال!' : 'فشل الربط'}</h5>
+                    <p className="text-xs font-bold opacity-70 leading-relaxed">{teleFeedback.message || teleFeedback.description}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100">
+             <div className="flex items-center gap-2 mb-4 text-amber-600">
+                <HelpCircle size={20} />
+                <h4 className="font-black text-sm">أسئلة شائعة</h4>
+             </div>
+             <div className="space-y-4">
+                <div>
+                   <p className="text-[10px] font-black text-amber-900 mb-1">لماذا لا تصل الرسائل؟</p>
+                   <p className="text-[10px] font-bold text-amber-700 opacity-80">يجب أن ترسل /start للبوت أولاً لفتح قناة التواصل.</p>
+                </div>
+                <div>
+                   <p className="text-[10px] font-black text-amber-900 mb-1">هل الـ ID هو اسم المستخدم؟</p>
+                   <p className="text-[10px] font-bold text-amber-700 opacity-80">لا، هو رقم طويل (مثل: 8273645) تحصل عليه من بوت @userinfobot.</p>
+                </div>
+                <div>
+                   <p className="text-[10px] font-black text-amber-900 mb-1">هل يمكن تغيير المعرف لاحقاً؟</p>
+                   <p className="text-[10px] font-bold text-amber-700 opacity-80">نعم، يمكنك حذفه ووضع رقم جديد في أي وقت.</p>
+                </div>
+             </div>
+          </div>
+
+          <button onClick={() => {
+            const p = prompt('أدخل كلمة المرور الجديدة:');
+            if (p) updateUserPassword(p).then(() => alert('تم التحديث'));
+          }} className="w-full py-4 bg-white border border-slate-200 rounded-2xl text-slate-400 font-black text-xs flex items-center justify-center gap-2 hover:bg-slate-50 transition-all">
+            <Lock size={14} /> تغيير كلمة المرور
+          </button>
+        </div>
       </div>
     </div>
   );
