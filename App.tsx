@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import MobileNav from './components/MobileNav';
@@ -45,6 +46,13 @@ const App: React.FC = () => {
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [trainees, setTrainees] = useState<Trainee[]>([]);
   const [editingReferral, setEditingReferral] = useState<Referral | undefined>(undefined);
+
+  // طلب صلاحية الإشعارات عند التشغيل
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -98,6 +106,15 @@ const App: React.FC = () => {
     }).length;
   }, [referrals, currentUser]);
 
+  // Fix: Defined effectiveRole to resolve reference errors in Sidebar and MobileNav components.
+  // This calculates the visual role based on whether a trainer is also a counselor.
+  const effectiveRole = useMemo(() => {
+    if (!currentUser) return UserRole.TRAINER;
+    if (currentUser.role === UserRole.HOD) return UserRole.HOD;
+    if (currentUser.isCounselor) return UserRole.COUNSELOR;
+    return currentUser.role;
+  }, [currentUser]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -110,27 +127,18 @@ const App: React.FC = () => {
       return;
     }
 
-    // 1. التحقق من البصمة المشفرة (النظام الجديد)
-    if (user.password === inputHash) {
+    if (user.password === inputHash || user.password === loginPass) {
+      if (user.password === loginPass) {
+        await updateDoc(doc(db, 'staff', user.id), { password: inputHash });
+      }
       setCurrentUser(user);
       setIsAuthenticated(true);
       setActivePage(user.role === UserRole.HOD || user.isCounselor ? 'dashboard' : 'new-referral');
-      return;
-    }
-
-    // 2. التحقق من النص الواضح (النظام القديم - هجرة تلقائية)
-    if (user.password === loginPass) {
-      // تحديث كلمة المرور في قاعدة البيانات لتصبح مشفرة فوراً
-      try {
-        await updateDoc(doc(db, 'staff', user.id), { password: inputHash });
-        console.log(`Password for ${user.username} has been migrated to SHA-256.`);
-      } catch (err) {
-        console.error("Migration failed:", err);
-      }
       
-      setCurrentUser({ ...user, password: inputHash });
-      setIsAuthenticated(true);
-      setActivePage(user.role === UserRole.HOD || user.isCounselor ? 'dashboard' : 'new-referral');
+      // التأكد من طلب الإذن عند الدخول
+      if ("Notification" in window) {
+        Notification.requestPermission();
+      }
       return;
     }
 
@@ -145,6 +153,15 @@ const App: React.FC = () => {
     const lastEvent = r.timeline[r.timeline.length - 1];
     const msg = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
     
+    // إرسال إشعار المتصفح المحلى
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("تنبيه نظام الإحالة", {
+        body: `${lastEvent.action}: للمتدرب ${r.traineeName}`,
+        icon: 'https://cdn-icons-png.flaticon.com/512/3119/3119338.png',
+        dir: 'rtl'
+      });
+    }
+
     let recipientsToNotify: Staff[] = [];
     const originalTrainer = staff.find(s => s.id === r.trainerId);
     if (originalTrainer) recipientsToNotify.push(originalTrainer);
@@ -276,8 +293,6 @@ const App: React.FC = () => {
       </div>
     );
   }
-
-  const effectiveRole = currentUser?.isCounselor ? UserRole.COUNSELOR : (currentUser?.role || UserRole.TRAINER);
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC] font-cairo overflow-hidden">
