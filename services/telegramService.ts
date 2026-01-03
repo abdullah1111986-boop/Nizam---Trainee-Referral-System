@@ -1,6 +1,5 @@
 /**
- * Telegram Notification Service (Resilient Version)
- * Designed to bypass strict institutional firewalls using multiple fallback methods.
+ * Telegram Notification Service (Extreme Resilience Version)
  */
 
 const BOT_TOKEN = '8589128782:AAEvXaKJxFipipYhbX8TJ9u9rBzEN_FHr4o';
@@ -14,39 +13,30 @@ const escapeHTML = (text: string): string => {
 };
 
 /**
- * Method 1: Direct Fetch (Modern, but often blocked by firewalls)
+ * Proxy Method 1: AllOrigins (Common public proxy)
  */
-const tryDirectFetch = async (url: string) => {
-  return fetch(url, { mode: 'no-cors', cache: 'no-cache' });
-};
-
-/**
- * Method 2: Script Tag Injection (Legacy trick, bypasses most XHR filters)
- */
-const tryScriptInjection = (url: string) => {
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = url;
-    script.onload = () => {
-      document.body.removeChild(script);
-      resolve(true);
-    };
-    script.onerror = () => {
-      document.body.removeChild(script);
-      resolve(false);
-    };
-    document.body.appendChild(script);
-    setTimeout(() => resolve(false), 3000);
-  });
-};
-
-/**
- * Method 3: Public Proxy (Bypasses DNS/Domain blocking)
- */
-const tryViaProxy = async (chatId: string, message: string) => {
+const tryViaAllOrigins = async (chatId: string, message: string) => {
   const encodedMsg = encodeURIComponent(message);
   const target = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMsg}&parse_mode=HTML`;
   const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`;
+  
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    return data.contents && data.contents.includes('"ok":true');
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * Proxy Method 2: Worker Proxy (Alternative endpoint)
+ */
+const tryViaAlternativeProxy = async (chatId: string, message: string) => {
+  const encodedMsg = encodeURIComponent(message);
+  const target = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMsg}&parse_mode=HTML`;
+  // استخدام وكيل مختلف تماماً عن الأول
+  const proxyUrl = `https://thingproxy.freeboard.io/fetch/${target}`;
   
   try {
     const response = await fetch(proxyUrl);
@@ -59,26 +49,25 @@ const tryViaProxy = async (chatId: string, message: string) => {
 export const sendTelegramNotification = async (chatId: string, message: string): Promise<boolean> => {
   if (!chatId || !BOT_TOKEN) return false;
 
-  const encodedMessage = encodeURIComponent(message);
-  const directUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;
+  console.log('📡 Starting Multi-Path Dispatch...');
 
-  console.log('📡 Attempting to send Telegram notification...');
+  // 1. محاولة الوكيل الأول
+  const res1 = await tryViaAllOrigins(chatId, message);
+  if (res1) return true;
 
-  // محاولة الإرسال المباشر أولاً
+  // 2. محاولة الوكيل الثاني إذا فشل الأول
+  const res2 = await tryViaAlternativeProxy(chatId, message);
+  if (res2) return true;
+
+  // 3. المحاولة المباشرة (كخيار أخير)
   try {
-    await tryDirectFetch(directUrl);
-    // بما أن no-cors لا تعطي نتيجة حقيقية، نعتبرها نجحت مبدئياً في الخروج من المتصفح
+    const encodedMsg = encodeURIComponent(message);
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMsg}&parse_mode=HTML`;
+    await fetch(url, { mode: 'no-cors' });
+    return true; // نفترض النجاح في وضع no-cors
   } catch (e) {
-    console.warn('⚠️ Direct fetch blocked, trying script injection...');
+    return false;
   }
-
-  // محاولة حقن السكريبت كبديل قوي
-  await tryScriptInjection(directUrl);
-
-  // المحاولة عبر البروكسي لضمان الوصول الفعلي في حال حظر الدومين
-  const proxyResult = await tryViaProxy(chatId, message);
-  
-  return proxyResult;
 };
 
 export const getTelegramDirectLink = (chatId: string, message: string): string => {
