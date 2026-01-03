@@ -1,5 +1,6 @@
 /**
- * Telegram Notification Service (CORS-Aware Version)
+ * Telegram Notification Service (CORS-Optimized)
+ * يستخدم طريقة Simple Requests لتجاوز قيود CORS في المتصفحات
  */
 
 const BOT_TOKEN = '8589128782:AAEvXaKJxFipipYhbX8TJ9u9rBzEN_FHr4o';
@@ -8,9 +9,7 @@ const TELEGRAM_API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 export interface TelegramResponse {
   success: boolean;
   message?: string;
-  errorCode?: number;
   description?: string;
-  isNetworkError?: boolean;
 }
 
 const escapeHTML = (text: string): string => {
@@ -22,61 +21,53 @@ const escapeHTML = (text: string): string => {
 };
 
 /**
- * يولد رابطاً مباشراً يمكن فتحه في المتصفح لتجاوز قيود الحماية (CORS)
- */
-export const getDirectTelegramLink = (chatId: string, text: string): string => {
-  return `${TELEGRAM_API_BASE}/sendMessage?chat_id=${chatId.trim()}&text=${encodeURIComponent(text)}&parse_mode=HTML`;
-};
-
-/**
- * يتحقق من صحة التوكين وحالة البوت
+ * يتحقق من حالة البوت باستخدام طلب GET بسيط
  */
 export const checkBotStatus = async (): Promise<TelegramResponse> => {
   try {
     const response = await fetch(`${TELEGRAM_API_BASE}/getMe`);
     const data = await response.json();
     if (data.ok) {
-      return { success: true, message: `البوت جاهز: @${data.result.username}` };
+      return { success: true, message: `البوت نشط: @${data.result.username}` };
     }
-    return { success: false, errorCode: data.error_code, description: data.description };
+    return { success: false, description: data.description };
   } catch (e) {
-    return { success: false, description: 'فشل الوصول لخوادم تيليجرام (مشكلة في الشبكة)', isNetworkError: true };
+    return { success: false, description: 'فشل الوصول للخادم (تحقق من اتصال الإنترنت)' };
   }
 };
 
 /**
- * إرسال إشعار مع تحليل الأخطاء
+ * إرسال الإشعار باستخدام x-www-form-urlencoded لتجنب preflight CORS
  */
 export const sendTelegramNotification = async (chatId: string, message: string): Promise<TelegramResponse> => {
-  if (!chatId) return { success: false, description: 'المعرف الرقمي (ID) ناقص' };
+  if (!chatId) return { success: false, description: 'المعرف الرقمي (ID) مطلوب' };
   
-  const endpoint = `${TELEGRAM_API_BASE}/sendMessage`;
-  const payload = {
-    chat_id: chatId.trim(),
-    text: message,
-    parse_mode: 'HTML'
-  };
+  // استخدام URLSearchParams يجعل المتصفح يتعامل معه كـ Simple Request
+  const params = new URLSearchParams();
+  params.append('chat_id', chatId.trim());
+  params.append('text', message);
+  params.append('parse_mode', 'HTML');
 
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${TELEGRAM_API_BASE}/sendMessage`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: params, // هذا يضبط الـ Content-Type تلقائياً إلى application/x-www-form-urlencoded
+      mode: 'cors'
     });
 
     const result = await response.json();
     if (result.ok) return { success: true };
 
-    let userFriendlyMsg = result.description;
-    if (result.error_code === 403) userFriendlyMsg = 'يجب إرسال /start للبوت أولاً من قبل المستخدم.';
-    if (result.error_code === 400) userFriendlyMsg = 'المعرف الرقمي (Chat ID) غير صحيح.';
+    let errorMsg = result.description;
+    if (result.error_code === 403) errorMsg = 'تأكد من إرسال كلمة (Start) للبوت في تيليجرام أولاً.';
+    if (result.error_code === 400) errorMsg = 'المعرف الرقمي غير صحيح، يرجى مراجعته.';
     
-    return { success: false, errorCode: result.error_code, description: result.description, message: userFriendlyMsg };
+    return { success: false, description: errorMsg };
   } catch (e) {
+    // في حال فشل الـ fetch تماماً (حظر من الشبكة)
     return { 
       success: false, 
-      isNetworkError: true,
-      description: 'تعذر الاتصال بخادم تيليجرام من متصفحك بسبب حماية الشبكة (CORS).' 
+      description: 'تعذر الاتصال بخوادم تيليجرام. يرجى التحقق من إعدادات الشبكة أو البروكسي في الكلية.' 
     };
   }
 };
