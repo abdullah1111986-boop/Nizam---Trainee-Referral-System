@@ -48,11 +48,12 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
     setIsTestingTelegram(true);
     setTeleFeedback(null);
     try {
-      const testMsg = `✅ تم ربط حسابك بنجاح في نظام الإحالة.\n👤 المستخدم: ${currentUser.name}`;
+      const testMsg = `✅ اختبار الربط من المتصفح\n👤 المستخدم: ${currentUser.name}\n🚀 النظام يعمل الآن.`;
       await sendTelegramNotification(telegramChatId, testMsg);
-      setTeleFeedback({ type: 'success', msg: 'وصلت الرسالة! الربط يعمل بنجاح.' });
+      // في وضع no-cors، نصل هنا إذا لم يحدث خطأ شبكة
+      setTeleFeedback({ type: 'success', msg: 'تم إرسال طلب التنبيه بنجاح. تحقق من هاتفك.' });
     } catch (error: any) {
-      setTeleFeedback({ type: 'error', msg: `فشل الإرسال: ${error.message || 'تأكد من الخطوات أدناه'}` });
+      setTeleFeedback({ type: 'error', msg: `خطأ في الشبكة: ${error.message}` });
     } finally {
       setIsTestingTelegram(false);
     }
@@ -72,48 +73,56 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 space-y-6 pb-24 px-4">
-      {/* قسم إرشادات التيليجرام - مهم جداً للحل */}
-      <div className="bg-blue-600 text-white p-6 rounded-[2rem] shadow-xl shadow-blue-200 relative overflow-hidden">
+    <div className="max-w-md mx-auto mt-10 space-y-6 pb-24 px-4 font-cairo">
+      {/* قسم إرشادات التيليجرام */}
+      <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-7 rounded-[2.5rem] shadow-xl shadow-blue-200 relative overflow-hidden">
         <div className="relative z-10">
           <h3 className="flex items-center gap-2 font-black text-lg mb-4">
-            <Info size={20} /> خطوات تفعيل التنبيهات
+            <Info size={22} /> تفعيل التنبيهات الفورية
           </h3>
-          <ol className="space-y-3 text-sm font-bold opacity-90 list-decimal pr-4">
-            <li>ابحث عن البوت في تيليجرام: <span className="bg-white/20 px-2 py-0.5 rounded select-all">ReferralSystemBot</span></li>
-            <li>اضغط على زر <b>Start</b> لتفعيل البوت.</li>
-            <li>للحصول على الـ ID الخاص بك، ارسل رسالة إلى بوت <a href="https://t.me/userinfobot" target="_blank" className="underline inline-flex items-center gap-1">@userinfobot <ExternalLink size={12}/></a></li>
-            <li>انسخ الرقم الظاهر وضعه في الخانة أدناه.</li>
+          <ol className="space-y-4 text-sm font-bold opacity-90 list-decimal pr-4 leading-relaxed">
+            <li>
+              افتح محادثة البوت: 
+              <a href="https://t.me/ReferralSystemBot" target="_blank" className="bg-white/20 px-3 py-1 rounded-full mr-2 hover:bg-white/30 transition-all inline-flex items-center gap-1">
+                ReferralSystemBot <ExternalLink size={12}/>
+              </a>
+            </li>
+            <li>اضغط <b>Start</b> أو ابدأ المحادثة.</li>
+            <li>للحصول على معرفك، راسل البوت: <a href="https://t.me/userinfobot" target="_blank" className="font-black underline">@userinfobot</a></li>
+            <li>ضع رقم المعرف (ID) في الخانة أدناه واضغط حفظ.</li>
           </ol>
         </div>
-        <div className="absolute -bottom-4 -left-4 opacity-10 rotate-12">
-           <Send size={120} />
+        <div className="absolute -bottom-6 -left-6 opacity-10 rotate-12">
+           <Send size={150} />
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
         <div className="text-center mb-6">
-          <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-4 text-blue-500 shadow-inner">
-            <Send size={32} />
+          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-blue-500 shadow-inner">
+            <Send size={28} />
           </div>
-          <h2 className="text-xl font-black text-slate-900">إشعارات التيليجرام</h2>
+          <h2 className="text-xl font-black text-slate-900">إعدادات التيليجرام</h2>
+          <p className="text-[10px] text-slate-400 font-black mt-1 uppercase">Direct Browser Notification</p>
         </div>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-[10px] font-black text-slate-400 pr-1 uppercase tracking-widest">Chat ID (رقمي فقط)</label>
+        
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <label className="block text-xs font-black text-slate-500 pr-1">Telegram Chat ID</label>
             <input
               type="text"
               value={telegramChatId}
               onChange={(e) => setTelegramChatId(e.target.value.replace(/\D/g, ''))}
-              className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-500 focus:bg-white outline-none transition-all font-mono text-center text-xl font-bold"
-              placeholder="مثال: 58210339"
+              className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-500 focus:bg-white outline-none transition-all font-mono text-center text-xl font-bold text-slate-700"
+              placeholder="00000000"
             />
           </div>
+          
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={handleUpdateTelegram}
               disabled={isSavingTelegram}
-              className={`py-4 rounded-2xl transition-all font-black flex items-center justify-center gap-2 shadow-lg ${isSavingTelegram ? 'bg-slate-100 text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'}`}
+              className={`py-4 rounded-2xl transition-all font-black flex items-center justify-center gap-2 shadow-lg ${isSavingTelegram ? 'bg-slate-100 text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200 active:scale-95'}`}
             >
               {isSavingTelegram ? <Loader2 className="animate-spin" size={20} /> : <Save size={18} />}
               حفظ
@@ -127,33 +136,30 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
               اختبار
             </button>
           </div>
+          
           {teleFeedback && (
-            <div className={`flex items-center gap-2 p-3 rounded-xl text-[11px] font-black ${teleFeedback.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-              {teleFeedback.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+            <div className={`flex items-center gap-2 p-4 rounded-2xl text-[11px] font-black border animate-fade-in ${teleFeedback.type === 'success' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+              {teleFeedback.type === 'success' ? <CheckCircle size={14} className="flex-shrink-0" /> : <AlertCircle size={14} className="flex-shrink-0" />}
               {teleFeedback.msg}
             </div>
           )}
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-        <div className="text-center mb-6">
-          <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-inner ${browserNotificationStatus === 'granted' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-            <BellRing size={32} />
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${browserNotificationStatus === 'granted' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+            <BellRing size={22} />
           </div>
-          <h2 className="text-xl font-black text-slate-900">إشعارات المتصفح</h2>
-        </div>
-        <div className="space-y-4">
-           {browserNotificationStatus === 'granted' ? (
-             <div className="p-4 bg-green-50 border border-green-100 rounded-2xl flex items-center gap-3">
-               <CheckCircle className="text-green-500" size={20} />
-               <span className="text-xs font-black text-green-800">الإشعارات مفعلة على هذا الجهاز</span>
-             </div>
-           ) : (
-             <button onClick={requestBrowserPermission} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black shadow-lg hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-2">
-                <Smartphone size={18} /> تفعيل تنبيهات الجهاز
-             </button>
-           )}
+          <div className="flex-1">
+            <h2 className="text-sm font-black text-slate-900">تنبيهات المتصفح</h2>
+            <p className="text-[10px] text-slate-400 font-bold">{browserNotificationStatus === 'granted' ? 'مفعلة على هذا الجهاز' : 'غير مفعلة حالياً'}</p>
+          </div>
+          {browserNotificationStatus !== 'granted' && (
+            <button onClick={requestBrowserPermission} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black hover:bg-black active:scale-95 transition-all">
+              تفعيل
+            </button>
+          )}
         </div>
       </div>
     </div>

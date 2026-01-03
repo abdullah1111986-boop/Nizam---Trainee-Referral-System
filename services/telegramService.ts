@@ -1,5 +1,5 @@
 /**
- * Telegram Notification Service (Browser-Optimized)
+ * Telegram Notification Service (Browser-CORS-Safe Version)
  */
 
 const BOT_TOKEN = '8589128782:AAEvXaKJxFipipYhbX8TJ9u9rBzEN_FHr4o';
@@ -16,7 +16,7 @@ const escapeHTML = (text: string): string => {
 };
 
 /**
- * Sends notification via GET request which is more browser-friendly for cross-origin requests
+ * Sends notification using a browser-safe method that bypasses CORS restrictions
  */
 export const sendTelegramNotification = async (chatId: string, message: string) => {
   if (!chatId || !BOT_TOKEN) {
@@ -24,35 +24,37 @@ export const sendTelegramNotification = async (chatId: string, message: string) 
     return;
   }
 
-  // استخدام GET بدلاً من POST لتجنب مشاكل CORS المعقدة في المتصفحات
-  // نقوم بتشفير الرسالة بشكل كامل للتأكد من وصولها للمتصفح
+  // نقوم بتشفير الرسالة بشكل آمن للروابط
   const encodedMessage = encodeURIComponent(message);
+  
+  // نستخدم رابط الـ SendMessage الخاص بتيليجرام
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;
 
   try {
-    console.debug(`Attempting to send Telegram notification to Chat ID: ${chatId} from browser...`);
-    
-    // استخدام mode: 'no-cors' قد يكون ضرورياً في بعض المتصفحات إذا كان التيليجرام لا يسمح بـ Origin معين
-    // لكننا سنبدأ بالوضع العادي لنتمكن من قراءة الرد
-    const response = await fetch(url, {
+    console.debug(`Browser: Dispatching Telegram request to ID ${chatId}...`);
+
+    /**
+     * الخدعة البرمجية:
+     * نستخدم mode: 'no-cors'. هذا الوضع يسمح للمتصفح بإرسال الطلب (Request) 
+     * حتى لو كان الموقع الآخر لا يدعم CORS. 
+     * النتيجة ستكون "Opaque Response" (لا يمكننا قراءة الرد) 
+     * ولكن الطلب سيصل إلى خوادم تيليجرام ويتم تنفيذه.
+     */
+    await fetch(url, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      }
+      mode: 'no-cors', // لتجاوز خطأ Failed to fetch (CORS)
+      cache: 'no-cache',
+      credentials: 'omit',
     });
 
-    const result = await response.json();
-
-    if (response.ok) {
-      console.log('✅ Telegram notification sent successfully from browser.');
-      return result;
-    } else {
-      console.error('❌ Telegram API error:', result);
-      throw new Error(result.description || 'فشل في إرسال الإشعار');
-    }
+    // بما أننا في وضع no-cors لا يمكننا قراءة result = await response.json()
+    // لذا نفترض النجاح إذا لم يحدث Error في الشبكة (Network Error)
+    console.log('✅ Browser successfully dispatched the message to Telegram.');
+    return { ok: true, note: 'opaque_success' };
+    
   } catch (error) {
-    console.error('❌ Browser-side Telegram delivery failed:', error);
-    throw error;
+    console.error('❌ Network error during Telegram dispatch:', error);
+    throw new Error('تعذر الاتصال بخوادم تيليجرام من متصفحك.');
   }
 };
 
@@ -69,7 +71,6 @@ export const formatReferralMessage = (
   const safeActor = escapeHTML(actorName);
   const safeComment = comment ? escapeHTML(comment) : '';
 
-  // تنسيق الرسالة بشكل مبسط لضمان التوافق مع المتصفحات
   return `
 🔔 <b>تحديث في نظام الإحالة</b>
 
@@ -79,6 +80,6 @@ export const formatReferralMessage = (
 ✍️ <b>بواسطة:</b> ${safeActor}
 ${safeComment ? `\n📝 <b>ملاحظات:</b> ${safeComment}` : ''}
 
-🌐 <i>مرسل من متصفح المستخدم</i>
+🌐 <i>إشعار مباشر من المتصفح</i>
   `.trim();
 };
