@@ -48,12 +48,17 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
     setIsTestingTelegram(true);
     setTeleFeedback(null);
     try {
-      const testMsg = `✅ اختبار الربط من المتصفح\n👤 المستخدم: ${currentUser.name}\n🚀 النظام يعمل الآن.`;
+      const testMsg = `✅ اختبار الربط الذكي من المتصفح\n👤 المستخدم: ${currentUser.name}\n🚀 تم تجاوز قيود الحماية بنجاح.`;
+      
+      // نستخدم الـ Beacon الآن
       await sendTelegramNotification(telegramChatId, testMsg);
-      // في وضع no-cors، نصل هنا إذا لم يحدث خطأ شبكة
-      setTeleFeedback({ type: 'success', msg: 'تم إرسال طلب التنبيه بنجاح. تحقق من هاتفك.' });
+      
+      setTeleFeedback({ 
+        type: 'success', 
+        msg: 'تم إرسال الطلب عبر المتصفح. تحقق من وصول الرسالة لهاتفك الآن.' 
+      });
     } catch (error: any) {
-      setTeleFeedback({ type: 'error', msg: `خطأ في الشبكة: ${error.message}` });
+      setTeleFeedback({ type: 'error', msg: 'حدث خطأ في المتصفح أثناء محاولة الإرسال.' });
     } finally {
       setIsTestingTelegram(false);
     }
@@ -103,7 +108,7 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
             <Send size={28} />
           </div>
           <h2 className="text-xl font-black text-slate-900">إعدادات التيليجرام</h2>
-          <p className="text-[10px] text-slate-400 font-black mt-1 uppercase">Direct Browser Notification</p>
+          <p className="text-[10px] text-slate-400 font-black mt-1 uppercase">Smart Browser Beacon Integration</p>
         </div>
         
         <div className="space-y-5">
