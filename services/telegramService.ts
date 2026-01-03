@@ -1,11 +1,12 @@
 /**
- * Telegram Notification Service (Browser-CORS-Safe via Image Beacon)
+ * Telegram Notification Service (Professional Format Version)
  */
 
 const BOT_TOKEN = '8589128782:AAEvXaKJxFipipYhbX8TJ9u9rBzEN_FHr4o';
 
 /**
  * Escapes HTML special characters to prevent Telegram API errors
+ * Telegram is very strict about unclosed tags or illegal entities.
  */
 const escapeHTML = (text: string): string => {
   if (!text) return '';
@@ -17,12 +18,11 @@ const escapeHTML = (text: string): string => {
 
 /**
  * Sends notification using "Image Beacon" technique.
- * This is the most robust way to bypass CORS in browsers.
+ * This bypasses CORS and sends the message as a background request.
  */
 export const sendTelegramNotification = (chatId: string, message: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (!chatId || !BOT_TOKEN) {
-      console.warn('Telegram Notification: Chat ID or Token missing.');
       resolve();
       return;
     }
@@ -30,36 +30,19 @@ export const sendTelegramNotification = (chatId: string, message: string): Promi
     const encodedMessage = encodeURIComponent(message);
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;
 
-    console.debug(`Browser Beacon: Sending notification to ${chatId}...`);
-
-    /**
-     * استخدام عنصر Image هو الطريقة المثلى لتجاوز CORS.
-     * المتصفح يسمح بتحميل الصور من أي نطاق (Domain) آخر دون قيود.
-     */
     const img = new Image();
-    
-    // عند نجاح الإرسال (حتى لو لم تكن صورة، وصول الطلب يكفي)
-    img.onload = () => {
-      console.log('✅ Telegram request delivered successfully.');
-      resolve();
-    };
-
-    // في معظم الحالات، تليجرام سيرد بـ JSON وليس صورة، لذا سيحدث "Error" في تحميل الصورة
-    // ولكن هذا الخطأ يحدث *بعد* وصول الطلب لتليجرام وتنفيذه.
-    img.onerror = () => {
-      // نعتبرها نجاحاً لأن الطلب GET تم إرساله بالفعل للخادم
-      console.log('📡 Telegram request dispatched (Image error expected but message sent).');
-      resolve();
-    };
-
-    // إطلاق الطلب
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
     img.src = url;
 
-    // مهلة زمنية للأمان
-    setTimeout(() => resolve(), 2000);
+    // Safety timeout
+    setTimeout(() => resolve(), 2500);
   });
 };
 
+/**
+ * Formats a professional and visually appealing message for Telegram
+ */
 export const formatReferralMessage = (
   action: string,
   traineeName: string,
@@ -73,15 +56,19 @@ export const formatReferralMessage = (
   const safeActor = escapeHTML(actorName);
   const safeComment = comment ? escapeHTML(comment) : '';
 
+  // القالب الجديد للرسالة
   return `
-🔔 <b>تحديث في نظام الإحالة</b>
+📝 <b>إشعار تحديث إحالة</b>
+────────────────
+📌 <b>الإجراء:</b> <code>${safeAction}</code>
+🔄 <b>الحالة الحالية:</b> <b>${safeStatus}</b>
 
-👤 <b>الإجراء:</b> ${safeAction}
-👨‍🎓 <b>المتدرب:</b> ${safeTrainee}
-🔄 <b>الحالة:</b> ${safeStatus}
-✍️ <b>بواسطة:</b> ${safeActor}
-${safeComment ? `\n📝 <b>ملاحظات:</b> ${safeComment}` : ''}
+👤 <b>المتدرب:</b> <code>${safeTrainee}</code>
+✍️ <b>بواسطة:</b> 👨‍🏫 ${safeActor}
 
-🌐 <i>مرسل عبر متصفح آمن</i>
+${safeComment ? `💬 <b>ملاحظات:</b>\n<i>${safeComment}</i>\n` : ''}
+────────────────
+📅 <b>التوقيت:</b> ${new Date().toLocaleString('ar-SA', { hour12: true, hour: '2-digit', minute: '2-digit' })}
+🌐 <b>نظام الإحالة الرقمي</b>
   `.trim();
 };

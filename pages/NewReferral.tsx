@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Trainee, Staff, CaseType, Repetition, ReferralStatus, Referral, UserRole, TimelineEvent } from '../types';
 import { Save, ArrowLeft, Send, CheckCircle, AlertTriangle, Printer, History, Sparkles, Loader2, UserCheck } from 'lucide-react';
@@ -89,6 +88,10 @@ const NewReferral: React.FC<NewReferralProps> = ({
       alert('الرجاء تعبئة جميع بيانات المتدرب (الاسم، الرقم التدريبي، التخصص)');
       return;
     }
+    
+    // بناء تعليق مخصص للتيليجرام يحتوي على تفاصيل أكثر عند الإنشاء لأول مرة
+    const detailedCommentForNotification = `نوع الحالة: ${selectedCaseTypes.join('، ')}\nالتكرار: ${repetition}`;
+
     const referral: Referral = {
       id: Date.now().toString(),
       traineeId: Date.now().toString(),
@@ -104,7 +107,7 @@ const NewReferral: React.FC<NewReferralProps> = ({
       repetition,
       previousActions,
       status: ReferralStatus.PENDING_HOD,
-      timeline: [createTimelineEvent('إنشاء الإحالة', 'تم رفع الإحالة لرئيس القسم')],
+      timeline: [createTimelineEvent('إنشاء إحالة جديدة', detailedCommentForNotification)],
       trainerSignature: true,
       hodSignature: false,
       counselorSignature: false,
