@@ -1,5 +1,6 @@
 /**
- * Telegram Notification Service (Extreme Resilience Version)
+ * Telegram Notification Service (Pure Direct Version)
+ * Sends notifications directly from the client browser to Telegram API.
  */
 
 const BOT_TOKEN = '8589128782:AAEvXaKJxFipipYhbX8TJ9u9rBzEN_FHr4o';
@@ -13,63 +14,43 @@ const escapeHTML = (text: string): string => {
 };
 
 /**
- * Proxy Method 1: AllOrigins (Common public proxy)
+ * Sends a message directly to Telegram Bot API.
+ * Note: Browser security (CORS) or local firewalls may block this if not permitted.
  */
-const tryViaAllOrigins = async (chatId: string, message: string) => {
-  const encodedMsg = encodeURIComponent(message);
-  const target = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMsg}&parse_mode=HTML`;
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`;
-  
+export const sendTelegramNotification = async (chatId: string, message: string): Promise<boolean> => {
+  if (!chatId || !BOT_TOKEN) return false;
+
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(message)}&parse_mode=HTML`;
+
+  console.log('📡 Attempting direct connection to Telegram API...');
+
   try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    return data.contents && data.contents.includes('"ok":true');
+    // محاولة الإرسال المباشر
+    const response = await fetch(url, {
+      method: 'GET',
+      // نستخدم 'no-cors' كخيار احتياطي إذا رفض المتصفح قراءة الرد، 
+      // لكن 'cors' هو الأفضل للتأكد من وصول الرسالة فعلياً.
+      mode: 'cors', 
+      cache: 'no-cache'
+    });
+
+    if (response.ok) {
+      console.log('✅ Notification sent successfully (Direct Path)');
+      return true;
+    }
+    
+    // في بعض الأحيان ينجح الإرسال لكن المتصفح يمنع قراءة الرد (CORS)
+    // نعتبر أن المحاولة تمت.
+    return response.status === 0 || response.ok;
   } catch (e) {
+    console.error('❌ Direct connection failed. Likely blocked by local network/firewall:', e);
     return false;
   }
 };
 
 /**
- * Proxy Method 2: Worker Proxy (Alternative endpoint)
+ * Generates a direct URL that can be opened in a new tab.
  */
-const tryViaAlternativeProxy = async (chatId: string, message: string) => {
-  const encodedMsg = encodeURIComponent(message);
-  const target = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMsg}&parse_mode=HTML`;
-  // استخدام وكيل مختلف تماماً عن الأول
-  const proxyUrl = `https://thingproxy.freeboard.io/fetch/${target}`;
-  
-  try {
-    const response = await fetch(proxyUrl);
-    return response.ok;
-  } catch (e) {
-    return false;
-  }
-};
-
-export const sendTelegramNotification = async (chatId: string, message: string): Promise<boolean> => {
-  if (!chatId || !BOT_TOKEN) return false;
-
-  console.log('📡 Starting Multi-Path Dispatch...');
-
-  // 1. محاولة الوكيل الأول
-  const res1 = await tryViaAllOrigins(chatId, message);
-  if (res1) return true;
-
-  // 2. محاولة الوكيل الثاني إذا فشل الأول
-  const res2 = await tryViaAlternativeProxy(chatId, message);
-  if (res2) return true;
-
-  // 3. المحاولة المباشرة (كخيار أخير)
-  try {
-    const encodedMsg = encodeURIComponent(message);
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMsg}&parse_mode=HTML`;
-    await fetch(url, { mode: 'no-cors' });
-    return true; // نفترض النجاح في وضع no-cors
-  } catch (e) {
-    return false;
-  }
-};
-
 export const getTelegramDirectLink = (chatId: string, message: string): string => {
   const encodedMessage = encodeURIComponent(message);
   return `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;

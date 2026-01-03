@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Staff } from '../types';
-import { Lock, Save, Send, Loader2, CheckCircle, AlertCircle, BellRing, Copy, Info, ExternalLink, Globe, ShieldAlert } from 'lucide-react';
-import { sendTelegramNotification, getTelegramDirectLink, formatReferralMessage } from '../services/telegramService';
+import { Lock, Save, Send, Loader2, CheckCircle, BellRing, Copy, Info, Globe, ShieldAlert, WifiOff } from 'lucide-react';
+import { sendTelegramNotification, getTelegramDirectLink } from '../services/telegramService';
 
 interface ProfileProps {
   currentUser: Staff;
@@ -14,7 +14,7 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
   const [isSavingTelegram, setIsSavingTelegram] = useState(false);
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
   const [teleFeedback, setTeleFeedback] = useState<{ type: 'success' | 'error' | 'info', msg: string } | null>(null);
-  const [showManualOptions, setShowManualOptions] = useState(false);
+  const [showNetworkHelp, setShowNetworkHelp] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
   const handleTestTelegram = async () => {
@@ -24,23 +24,23 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
     }
     setIsTestingTelegram(true);
     setTeleFeedback(null);
-    setShowManualOptions(false);
+    setShowNetworkHelp(false);
 
-    const testMsg = `✅ <b>اختبار نظام الإحالة</b>\n👤 المستخدم: ${currentUser.name}\n🚀 تم التوصيل عبر خوادم وسيطة لتجاوز حظر الشبكة.`;
+    const testMsg = `✅ <b>اختبار مباشر</b>\n👤 المستخدم: ${currentUser.name}\nتم الإرسال مباشرة من المتصفح دون وسائط.`;
     
     const success = await sendTelegramNotification(telegramChatId, testMsg);
     
     if (success) {
       setTeleFeedback({ 
         type: 'success', 
-        msg: 'تم إرسال الطلب عبر وكلاء خارجيين. تحقق من تليجرام الآن.' 
+        msg: 'تم إرسال الطلب المباشر بنجاح! تحقق من هاتفك.' 
       });
     } else {
       setTeleFeedback({ 
         type: 'error', 
-        msg: 'فشلت جميع محاولات التوصيل الآلي بسبب قيود الشبكة الشديدة.' 
+        msg: 'تعذر الاتصال بخادم تيليجرام. الشبكة المحلية قد تمنع الطلبات المباشرة.' 
       });
-      setShowManualOptions(true);
+      setShowNetworkHelp(true);
     }
     setIsTestingTelegram(false);
   };
@@ -54,16 +54,16 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
     setIsSavingTelegram(true);
     try {
       await onUpdateTelegram(telegramChatId);
-      setTeleFeedback({ type: 'success', msg: 'تم حفظ المعرف في حسابك' });
+      setTeleFeedback({ type: 'success', msg: 'تم حفظ المعرف في النظام' });
     } catch (error) {
-      setTeleFeedback({ type: 'error', msg: 'حدث خطأ أثناء الحفظ' });
+      setTeleFeedback({ type: 'error', msg: 'حدث خطأ أثناء حفظ البيانات' });
     } finally {
       setIsSavingTelegram(false);
     }
   };
 
   const handleCopyTestText = () => {
-    const text = `أهلاً، أنا ${currentUser.name}، أختبر الربط يدوياً لمعرفي: ${telegramChatId}`;
+    const text = `أهلاً، أنا ${currentUser.name}، أختبر الربط المباشر لمعرفي: ${telegramChatId}`;
     navigator.clipboard.writeText(text);
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
@@ -71,15 +71,15 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
 
   return (
     <div className="max-w-md mx-auto mt-6 space-y-6 pb-24 px-4 font-cairo">
-      {/* تعليمات الربط */}
+      {/* قسم التوجيه */}
       <div className="bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl border border-slate-800">
         <h3 className="flex items-center gap-2 font-black text-sm mb-4 text-blue-400">
-          <Info size={18} /> كيفية الحصول على المعرف
+          <Info size={18} /> ربط مباشر بالبوت
         </h3>
         <div className="space-y-3 text-[11px] font-bold opacity-90">
-          <p>1. تأكد من تفعيل البوت: <a href="https://t.me/ReferralSystemBot" target="_blank" className="text-blue-400 underline">@ReferralSystemBot</a></p>
-          <p>2. أرسل أي رسالة للبوت <a href="https://t.me/userinfobot" target="_blank" className="text-blue-400 underline">@userinfobot</a> ليعطيك رقم المعرف (Id).</p>
-          <p className="text-orange-400">ملاحظة: إذا بدأ المعرف بعلامة سالب (-) اكتبها كما هي.</p>
+          <p>1. افتح البوت <a href="https://t.me/ReferralSystemBot" target="_blank" className="text-blue-400 underline">@ReferralSystemBot</a> واضغط <b>ابدأ</b>.</p>
+          <p>2. أدخل رقم الـ ID الخاص بك (يمكنك الحصول عليه من <a href="https://t.me/userinfobot" target="_blank" className="text-blue-400 underline">@userinfobot</a>).</p>
+          <p className="text-blue-300 italic">ملاحظة: النظام الآن يتصل بـ Telegram مباشرة من جهازك.</p>
         </div>
       </div>
 
@@ -88,18 +88,18 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
           <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-blue-600">
             <BellRing size={26} />
           </div>
-          <h2 className="text-lg font-black text-slate-900">ربط الإشعارات</h2>
+          <h2 className="text-lg font-black text-slate-900">إعدادات الإشعارات</h2>
         </div>
         
         <div className="space-y-4">
           <div>
-            <label className="block text-[10px] font-black text-slate-500 mb-1 pr-1 uppercase">Telegram ID</label>
+            <label className="block text-[10px] font-black text-slate-500 mb-1 pr-1 uppercase">Telegram Chat ID</label>
             <input
               type="text"
               value={telegramChatId}
               onChange={(e) => setTelegramChatId(e.target.value.replace(/[^\d-]/g, ''))}
               className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:border-blue-500 outline-none text-center text-xl font-black text-slate-700 transition-all"
-              placeholder="-100123456"
+              placeholder="-123456789"
             />
           </div>
           
@@ -110,7 +110,7 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
               className="py-4 bg-slate-900 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
             >
               {isSavingTelegram ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              حفظ
+              حفظ الهوية
             </button>
             <button
               onClick={handleTestTelegram}
@@ -118,7 +118,7 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
               className="py-4 bg-blue-600 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95"
             >
               {isTestingTelegram ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-              اختبار
+              اختبار مباشر
             </button>
           </div>
           
@@ -129,27 +129,23 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
             </div>
           )}
 
-          {showManualOptions && (
-            <div className="mt-4 p-5 bg-slate-50 rounded-[1.5rem] border border-slate-200 space-y-4">
-              <div className="text-center space-y-2">
-                <p className="text-[11px] font-black text-slate-600">
-                  ⚠️ شبكة الكلية تحظر روابط تليجرام المباشرة تماماً. 
-                </p>
-                <div className="h-px bg-slate-200 w-full my-2"></div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase italic">الحل اليدوي الأخير</p>
+          {showNetworkHelp && (
+            <div className="mt-4 p-5 bg-amber-50 rounded-[1.5rem] border border-amber-100 space-y-4">
+              <div className="flex items-center gap-2 text-amber-800">
+                <WifiOff size={18} />
+                <p className="text-[11px] font-black italic">تحليل المشكلة:</p>
               </div>
-
+              <p className="text-[10px] font-bold text-amber-900 leading-relaxed">
+                بما أنك تستخدم <b>الاتصال المباشر</b>، فإن المتصفح يحاول محادثة خوادم تيليجرام بنفسه. إذا لم تصل الرسالة، فهذا يعني أن جدار حماية شبكة الكلية يمنع هذه "المحادثة".
+              </p>
+              
               <button 
                 onClick={handleCopyTestText}
-                className={`w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all shadow-sm border ${copySuccess ? 'bg-green-600 text-white border-green-600' : 'bg-white text-slate-700 border-slate-200'}`}
+                className={`w-full py-3 rounded-xl font-black text-[10px] flex items-center justify-center gap-2 transition-all shadow-sm border ${copySuccess ? 'bg-green-600 text-white border-green-600' : 'bg-white text-amber-700 border-amber-200'}`}
               >
-                {copySuccess ? <CheckCircle size={16} /> : <Copy size={16} />}
-                {copySuccess ? 'تم النسخ!' : 'نسخ رسالة تعريفية للبوت'}
+                {copySuccess ? <CheckCircle size={14} /> : <Copy size={14} />}
+                {copySuccess ? 'تم النسخ' : 'نسخ نص للتحقق اليدوي من الهاتف'}
               </button>
-              
-              <p className="text-[9px] text-slate-400 text-center font-bold px-4 leading-relaxed">
-                انسخ النص أعلاه، ثم افتح تليجرام من هاتفك (ببيانات الجوال) وأرسله للبوت <a href="https://t.me/ReferralSystemBot" className="text-blue-500 underline">@ReferralSystemBot</a> لتأكيد الهوية.
-              </p>
             </div>
           )}
         </div>
@@ -157,16 +153,16 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
 
       <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
          <h4 className="font-black text-xs text-slate-800 mb-2 flex items-center gap-2">
-           <Lock size={16} className="text-slate-400" /> الأمان
+           <Lock size={16} className="text-slate-400" /> تغيير المرور
          </h4>
          <button 
             onClick={() => {
               const p = prompt('أدخل كلمة المرور الجديدة:');
               if (p) updateUserPassword(p).then(() => alert('تم التغيير بنجاح'));
             }}
-            className="w-full py-3 border-2 border-slate-50 text-slate-500 rounded-xl font-black text-xs hover:bg-slate-100 transition-all"
+            className="w-full py-3 border-2 border-slate-50 text-slate-400 rounded-xl font-black text-[10px] hover:bg-slate-50 transition-all"
          >
-           تعديل كلمة المرور
+           تعديل البيانات السرية
          </button>
       </div>
     </div>
