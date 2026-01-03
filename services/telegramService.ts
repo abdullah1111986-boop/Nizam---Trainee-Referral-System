@@ -1,12 +1,11 @@
 /**
- * Telegram Notification Service (Professional Format Version)
+ * Telegram Notification Service (CORS-Optimized)
  */
 
 const BOT_TOKEN = '8589128782:AAEvXaKJxFipipYhbX8TJ9u9rBzEN_FHr4o';
 
 /**
- * Escapes HTML special characters to prevent Telegram API errors
- * Telegram is very strict about unclosed tags or illegal entities.
+ * Escapes HTML characters strictly for Telegram
  */
 const escapeHTML = (text: string): string => {
   if (!text) return '';
@@ -17,31 +16,40 @@ const escapeHTML = (text: string): string => {
 };
 
 /**
- * Sends notification using "Image Beacon" technique.
- * This bypasses CORS and sends the message as a background request.
+ * Sends notification using fetch with 'no-cors' mode.
+ * This ensures the GET request is dispatched even if the browser blocks the response.
  */
-export const sendTelegramNotification = (chatId: string, message: string): Promise<void> => {
-  return new Promise((resolve) => {
-    if (!chatId || !BOT_TOKEN) {
-      resolve();
-      return;
-    }
+export const sendTelegramNotification = async (chatId: string, message: string): Promise<boolean> => {
+  if (!chatId || !BOT_TOKEN) return false;
 
-    const encodedMessage = encodeURIComponent(message);
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;
+  const encodedMessage = encodeURIComponent(message);
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;
 
-    const img = new Image();
-    img.onload = () => resolve();
-    img.onerror = () => resolve();
-    img.src = url;
-
-    // Safety timeout
-    setTimeout(() => resolve(), 2500);
-  });
+  try {
+    // نستخدم no-cors لضمان خروج الطلب من المتصفح دون حظر بسبب سياسات CORS
+    await fetch(url, {
+      mode: 'no-cors',
+      cache: 'no-cache',
+      credentials: 'omit'
+    });
+    console.log('📡 Telegram message dispatched via fetch (no-cors)');
+    return true;
+  } catch (error) {
+    console.error('❌ Network error sending to Telegram:', error);
+    return false;
+  }
 };
 
 /**
- * Formats a professional and visually appealing message for Telegram
+ * Generates a direct link that the user can open to send a message (Fallback method)
+ */
+export const getTelegramDirectLink = (chatId: string, message: string): string => {
+  const encodedMessage = encodeURIComponent(message);
+  return `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;
+};
+
+/**
+ * Professional Telegram Message Template
  */
 export const formatReferralMessage = (
   action: string,
@@ -56,19 +64,17 @@ export const formatReferralMessage = (
   const safeActor = escapeHTML(actorName);
   const safeComment = comment ? escapeHTML(comment) : '';
 
-  // القالب الجديد للرسالة
   return `
-📝 <b>إشعار تحديث إحالة</b>
+<b>🔔 إشعار من نظام الإحالة</b>
 ────────────────
-📌 <b>الإجراء:</b> <code>${safeAction}</code>
-🔄 <b>الحالة الحالية:</b> <b>${safeStatus}</b>
+<b>📌 الإجراء:</b> <code>${safeAction}</code>
+<b>🔄 الحالة:</b> ${safeStatus}
 
-👤 <b>المتدرب:</b> <code>${safeTrainee}</code>
-✍️ <b>بواسطة:</b> 👨‍🏫 ${safeActor}
+<b>👤 المتدرب:</b> ${safeTrainee}
+<b>✍️ بواسطة:</b> ${safeActor}
 
-${safeComment ? `💬 <b>ملاحظات:</b>\n<i>${safeComment}</i>\n` : ''}
+${safeComment ? `<b>📝 ملاحظات:</b>\n<i>${safeComment}</i>\n` : ''}
 ────────────────
-📅 <b>التوقيت:</b> ${new Date().toLocaleString('ar-SA', { hour12: true, hour: '2-digit', minute: '2-digit' })}
-🌐 <b>نظام الإحالة الرقمي</b>
+📅 ${new Date().toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
   `.trim();
 };
