@@ -106,35 +106,38 @@ const App: React.FC = () => {
     
     let recipientsToNotify: Staff[] = [];
     
-    // 1. دائماً نضيف المدرب الأصلي لصاحب الإحالة ليتابع حالتها في جميع المراحل
+    // 1. إضافة المدرب الأصلي
     const originalTrainer = staff.find(s => s.id === r.trainerId);
-    if (originalTrainer) {
-      recipientsToNotify.push(originalTrainer);
-    }
+    if (originalTrainer) recipientsToNotify.push(originalTrainer);
 
-    // 2. إذا كانت الحالة بانتظار رئيس القسم، نضيف رؤساء الأقسام المعنيين بالتخصص
+    // 2. رؤساء الأقسام المعنيين
     if (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) {
       const HODs = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
       recipientsToNotify.push(...HODs);
     } 
     
-    // 3. إذا كانت الحالة بانتظار المرشد، نضيف جميع المرشدين
+    // 3. المرشدين
     if (r.status === ReferralStatus.PENDING_COUNSELOR) {
       const counselors = staff.filter(s => s.isCounselor);
       recipientsToNotify.push(...counselors);
     }
 
-    // 4. تصفية القائمة: استثناء المستخدم الحالي، وضمان وجود معرف تيليجرام، ومنع التكرار
+    // 4. تصفية ومعالجة الإرسال السريع بالتوازي
     const uniqueRecipients = Array.from(new Set(recipientsToNotify.map(s => s.id)))
       .map(id => staff.find(s => s.id === id))
       .filter((s): s is Staff => 
         !!s && 
         !!s.telegramChatId && 
-        s.id !== currentUser.id // لا ترسل إشعاراً للشخص الذي قام بالإجراء نفسه
+        s.id !== currentUser.id
       );
 
-    for (const recipient of uniqueRecipients) {
-      await sendTelegramNotification(recipient.telegramChatId!, msg);
+    // استخدام Promise.all لإرسال كافة التنبيهات في نفس الوقت بدلاً من الانتظار التسلسلي
+    try {
+      await Promise.all(uniqueRecipients.map(recipient => 
+        sendTelegramNotification(recipient.telegramChatId!, msg)
+      ));
+    } catch (error) {
+      console.error('Fast Notification Error:', error);
     }
   };
 
@@ -147,7 +150,8 @@ const App: React.FC = () => {
         return <NewReferral {...commonProps} trainees={trainees} 
           onSubmit={async (r) => { 
             await setDoc(doc(db, 'referrals', r.id), r); 
-            try { await triggerNotifications(r); } catch (e) { console.error("Notification Error:", e); }
+            // تشغيل التنبيهات في الخلفية دون انتظارها لضمان سرعة الواجهة
+            triggerNotifications(r).catch(e => console.error("Notification BG Error:", e));
             setEditingReferral(undefined);
             setActivePage('referrals'); 
           }} 
