@@ -101,26 +101,28 @@ const App: React.FC = () => {
   const triggerNotifications = async (r: Referral) => {
     if (!currentUser || !staff.length) return;
 
+    // الشرط: إرسال الإشعارات فقط إذا كانت الحالة PENDING_HOD أو PENDING_COUNSELOR
+    const allowedStatuses = [ReferralStatus.PENDING_HOD, ReferralStatus.PENDING_COUNSELOR];
+    if (!allowedStatuses.includes(r.status)) {
+      return;
+    }
+
     const lastEvent = r.timeline[r.timeline.length - 1];
     const msg = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
     
     let recipientsToNotify: Staff[] = [];
     
-    // 1. إضافة المدرب الأصلي
+    // 1. المدرب الأصلي صاحب الإحالة
     const originalTrainer = staff.find(s => s.id === r.trainerId);
     if (originalTrainer) recipientsToNotify.push(originalTrainer);
 
-    // 2. رؤساء الأقسام المعنيين
-    if (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) {
-      const HODs = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
-      recipientsToNotify.push(...HODs);
-    } 
+    // 2. رؤساء الأقسام المعنيين بالتخصص
+    const HODs = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
+    recipientsToNotify.push(...HODs);
     
-    // 3. المرشدين
-    if (r.status === ReferralStatus.PENDING_COUNSELOR) {
-      const counselors = staff.filter(s => s.isCounselor);
-      recipientsToNotify.push(...counselors);
-    }
+    // 3. المرشدين التدريبيين
+    const counselors = staff.filter(s => s.isCounselor);
+    recipientsToNotify.push(...counselors);
 
     // 4. تصفية ومعالجة الإرسال السريع بالتوازي
     const uniqueRecipients = Array.from(new Set(recipientsToNotify.map(s => s.id)))
@@ -128,10 +130,9 @@ const App: React.FC = () => {
       .filter((s): s is Staff => 
         !!s && 
         !!s.telegramChatId && 
-        s.id !== currentUser.id
+        s.id !== currentUser.id // منع إرسال إشعار للمستخدم الذي قام بالإجراء
       );
 
-    // استخدام Promise.all لإرسال كافة التنبيهات في نفس الوقت بدلاً من الانتظار التسلسلي
     try {
       await Promise.all(uniqueRecipients.map(recipient => 
         sendTelegramNotification(recipient.telegramChatId!, msg)
