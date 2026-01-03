@@ -1,5 +1,5 @@
 /**
- * Telegram Notification Service (Advanced Direct POST Version)
+ * Telegram Notification Service (Professional POST Version)
  * Optimized for 100% compatibility with Telegram Bot API.
  */
 
@@ -16,7 +16,6 @@ const escapeHTML = (text: string): string => {
 
 /**
  * Sends a message to Telegram using the POST method with JSON body.
- * This is the most reliable way to interact with Telegram API from a browser.
  */
 export const sendTelegramNotification = async (chatId: string, message: string): Promise<boolean> => {
   if (!chatId || !BOT_TOKEN) return false;
@@ -51,13 +50,13 @@ export const sendTelegramNotification = async (chatId: string, message: string):
       return false;
     }
   } catch (e) {
-    console.error('❌ Network Error: Connection to Telegram failed. Check internet/firewall.', e);
+    console.error('❌ Network Error: Connection to Telegram failed.', e);
     return false;
   }
 };
 
 /**
- * Enhanced formatter for Telegram messages with better visual hierarchy.
+ * Enhanced formatter for Telegram messages.
  */
 export const formatReferralMessage = (
   action: string,
@@ -73,13 +72,13 @@ export const formatReferralMessage = (
   const safeComment = comment ? escapeHTML(comment) : '';
 
   return `
-<b>🔔 إشعار نظام الإحالة</b>
+<b>🔔 إشعار من نظام الإحالة</b>
 <b>────────────────</b>
 <b>📌 الإجراء:</b> <code>${safeAction}</code>
-<b>🔄 الحالة:</b> <b>${safeStatus}</b>
+<b>🔄 الحالة الحالية:</b> <b>${safeStatus}</b>
 <b>👤 المتدرب:</b> <code>${safeTrainee}</code>
 <b>✍️ بواسطة:</b> <i>${safeActor}</i>
-${safeComment ? `\n<b>📝 ملاحظات:</b>\n<blockquote>${safeComment}</blockquote>` : ''}
+${safeComment ? `\n<b>📝 ملاحظات الإجراء:</b>\n<blockquote>${safeComment}</blockquote>` : ''}
 <b>────────────────</b>
 📅 ${new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
   `.trim();

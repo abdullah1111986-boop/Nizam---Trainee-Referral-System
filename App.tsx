@@ -51,14 +51,11 @@ const App: React.FC = () => {
           for (const s of INITIAL_STAFF) { await setDoc(doc(db, 'staff', s.id), s); }
         } else {
           const staffData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Staff));
-          
-          // ترتيب: رؤساء الأقسام أولاً لتسهيل وصولهم
           staffData.sort((a, b) => {
             if (a.role === UserRole.HOD && b.role !== UserRole.HOD) return -1;
             if (a.role !== UserRole.HOD && b.role === UserRole.HOD) return 1;
             return a.name.localeCompare(b.name, 'ar');
           });
-          
           setStaff(staffData);
           setIsLoading(false);
         }
@@ -110,25 +107,44 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * إطلاق الإشعارات فور تأكيد نجاح عملية الحفظ في Firebase
+   */
   const triggerNotifications = async (r: Referral) => {
     if (!currentUser || !staff.length) return;
+    
     const lastEvent = r.timeline[r.timeline.length - 1];
     const htmlMessage = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
     
+    // 1. إشعار المتصفح المحلي (إذا كان مفعلاً)
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("تحديث إحالة", { 
+        body: `${r.traineeName}: ${lastEvent.action}`, 
+        icon: '/favicon.ico',
+        dir: 'rtl' 
+      });
+    }
+
+    // 2. تصفية المستهدفين بالإشعار
     let potentialRecipients: Staff[] = [];
+    
+    // المدرب صاحب الحالة يصله إشعار دائماً عن أي تحديث
     const trainer = staff.find(s => s.id === r.trainerId);
     if (trainer) potentialRecipients.push(trainer);
 
+    // إذا كانت بانتظار رئيس القسم
     if (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) {
       const hods = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
       potentialRecipients.push(...hods);
     }
 
+    // إذا كانت بانتظار المرشد
     if (r.status === ReferralStatus.PENDING_COUNSELOR) {
       const counselors = staff.filter(s => s.isCounselor);
       potentialRecipients.push(...counselors);
     }
 
+    // إرسال الإشعارات لمن يمتلك Chat ID ومفعل للبوت
     const uniqueRecipients = potentialRecipients.filter((s, index, self) => 
       s.telegramChatId && 
       s.id !== currentUser.id && 
@@ -148,7 +164,9 @@ const App: React.FC = () => {
       case 'new-referral': 
         return <NewReferral {...commonProps} trainees={trainees} 
           onSubmit={async (r) => { 
+            // ننتظر نجاح الكتابة في قاعدة البيانات أولاً
             await setDoc(doc(db, 'referrals', r.id), r); 
+            // نطلق الإشعارات فوراً بعد التأكد من الحفظ
             triggerNotifications(r);
             setEditingReferral(undefined);
             setActivePage('referrals'); 
