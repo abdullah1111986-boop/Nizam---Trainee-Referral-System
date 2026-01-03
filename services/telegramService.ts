@@ -1,9 +1,10 @@
 /**
- * Telegram Notification Service (Pure Direct Version)
- * Sends notifications directly from the client browser to Telegram API.
+ * Telegram Notification Service (Advanced Direct POST Version)
+ * Optimized for 100% compatibility with Telegram Bot API.
  */
 
 const BOT_TOKEN = '8589128782:AAEvXaKJxFipipYhbX8TJ9u9rBzEN_FHr4o';
+const TELEGRAM_API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 const escapeHTML = (text: string): string => {
   if (!text) return '';
@@ -14,48 +15,50 @@ const escapeHTML = (text: string): string => {
 };
 
 /**
- * Sends a message directly to Telegram Bot API.
- * Note: Browser security (CORS) or local firewalls may block this if not permitted.
+ * Sends a message to Telegram using the POST method with JSON body.
+ * This is the most reliable way to interact with Telegram API from a browser.
  */
 export const sendTelegramNotification = async (chatId: string, message: string): Promise<boolean> => {
   if (!chatId || !BOT_TOKEN) return false;
 
-  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(message)}&parse_mode=HTML`;
-
-  console.log('📡 Attempting direct connection to Telegram API...');
+  const endpoint = `${TELEGRAM_API_BASE}/sendMessage`;
+  
+  const payload = {
+    chat_id: chatId,
+    text: message,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    disable_notification: false
+  };
 
   try {
-    // محاولة الإرسال المباشر
-    const response = await fetch(url, {
-      method: 'GET',
-      // نستخدم 'no-cors' كخيار احتياطي إذا رفض المتصفح قراءة الرد، 
-      // لكن 'cors' هو الأفضل للتأكد من وصول الرسالة فعلياً.
-      mode: 'cors', 
-      cache: 'no-cache'
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      mode: 'cors'
     });
 
-    if (response.ok) {
-      console.log('✅ Notification sent successfully (Direct Path)');
+    const result = await response.json();
+
+    if (result.ok) {
+      console.log(`✅ Telegram: Message delivered to ${chatId}`);
       return true;
+    } else {
+      console.error(`❌ Telegram API Error: ${result.description}`);
+      return false;
     }
-    
-    // في بعض الأحيان ينجح الإرسال لكن المتصفح يمنع قراءة الرد (CORS)
-    // نعتبر أن المحاولة تمت.
-    return response.status === 0 || response.ok;
   } catch (e) {
-    console.error('❌ Direct connection failed. Likely blocked by local network/firewall:', e);
+    console.error('❌ Network Error: Connection to Telegram failed. Check internet/firewall.', e);
     return false;
   }
 };
 
 /**
- * Generates a direct URL that can be opened in a new tab.
+ * Enhanced formatter for Telegram messages with better visual hierarchy.
  */
-export const getTelegramDirectLink = (chatId: string, message: string): string => {
-  const encodedMessage = encodeURIComponent(message);
-  return `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;
-};
-
 export const formatReferralMessage = (
   action: string,
   traineeName: string,
@@ -71,13 +74,13 @@ export const formatReferralMessage = (
 
   return `
 <b>🔔 إشعار نظام الإحالة</b>
-────────────────
+<b>────────────────</b>
 <b>📌 الإجراء:</b> <code>${safeAction}</code>
-<b>🔄 الحالة:</b> ${safeStatus}
-<b>👤 المتدرب:</b> ${safeTrainee}
-<b>✍️ بواسطة:</b> ${safeActor}
-${safeComment ? `\n<b>📝 ملاحظات:</b>\n<i>${safeComment}</i>` : ''}
-────────────────
+<b>🔄 الحالة:</b> <b>${safeStatus}</b>
+<b>👤 المتدرب:</b> <code>${safeTrainee}</code>
+<b>✍️ بواسطة:</b> <i>${safeActor}</i>
+${safeComment ? `\n<b>📝 ملاحظات:</b>\n<blockquote>${safeComment}</blockquote>` : ''}
+<b>────────────────</b>
 📅 ${new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
   `.trim();
 };
