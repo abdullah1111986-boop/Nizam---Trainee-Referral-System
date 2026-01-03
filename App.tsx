@@ -13,10 +13,25 @@ import { db } from './services/firebase';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { sendTelegramNotification, formatReferralMessage } from './services/telegramService';
 
+/**
+ * وظيفة أمنية لتوليد بصمة رقمية مشفرة لكلمة المرور (SHA-256)
+ * تمنع تخزين كلمات المرور بنصوص واضحة في الكود أو قاعدة البيانات
+ */
+export const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// بصمة مشفرة لكلمة المرور الافتراضية "123" (لأغراض التهيئة الأولى فقط)
+const INITIAL_HASH = "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
+
 const INITIAL_STAFF: Staff[] = [
-  { id: 'hod1', name: 'م. عبدالله الزهراني', username: 'م. عبدالله Zahrani', password: '123', role: UserRole.HOD, specialization: 'محركات ومركبات' },
-  { id: 'hod2', name: 'م. ياسر الشربي', username: 'م. ياسر الشربي', password: '123', role: UserRole.HOD, specialization: 'تصنيع' },
-  { id: 'counselor1', name: 'ماجد ابراهيم المرزوقي', username: 'ماجد ابراهيم المرزوقي', password: '123', role: UserRole.TRAINER, specialization: 'توجيه وإرشاد', isCounselor: true },
+  { id: 'hod1', name: 'م. عبدالله الزهراني', username: 'م. عبدالله Zahrani', password: INITIAL_HASH, role: UserRole.HOD, specialization: 'محركات ومركبات' },
+  { id: 'hod2', name: 'م. ياسر الشربي', username: 'م. ياسر الشربي', password: INITIAL_HASH, role: UserRole.HOD, specialization: 'تصنيع' },
+  { id: 'counselor1', name: 'ماجد ابراهيم المرزوقي', username: 'ماجد ابراهيم المرزوقي', password: INITIAL_HASH, role: UserRole.TRAINER, specialization: 'توجيه وإرشاد', isCounselor: true },
 ];
 
 const App: React.FC = () => {
@@ -32,7 +47,6 @@ const App: React.FC = () => {
   const [trainees, setTrainees] = useState<Trainee[]>([]);
   const [editingReferral, setEditingReferral] = useState<Referral | undefined>(undefined);
 
-  // جلب بيانات الموظفين
   useEffect(() => {
     let unsubscribe = () => {};
     try {
@@ -61,7 +75,6 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // جلب الإحالات
   useEffect(() => {
     let unsubscribe = () => {};
     try {
@@ -86,9 +99,14 @@ const App: React.FC = () => {
     }).length;
   }, [referrals, currentUser]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = staff.find(s => s.username === loginUser && s.password === loginPass);
+    setLoginError('');
+    
+    // تشفير كلمة المرور المدخلة قبل المقارنة
+    const inputHash = await hashPassword(loginPass);
+    const user = staff.find(s => s.username === loginUser && s.password === inputHash);
+    
     if (user) {
       setCurrentUser(user);
       setIsAuthenticated(true);
@@ -100,38 +118,23 @@ const App: React.FC = () => {
 
   const triggerNotifications = async (r: Referral) => {
     if (!currentUser || !staff.length) return;
-
-    // الشرط: إرسال الإشعارات فقط إذا كانت الحالة PENDING_HOD أو PENDING_COUNSELOR
     const allowedStatuses = [ReferralStatus.PENDING_HOD, ReferralStatus.PENDING_COUNSELOR];
-    if (!allowedStatuses.includes(r.status)) {
-      return;
-    }
+    if (!allowedStatuses.includes(r.status)) return;
 
     const lastEvent = r.timeline[r.timeline.length - 1];
     const msg = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
     
     let recipientsToNotify: Staff[] = [];
-    
-    // 1. المدرب الأصلي صاحب الإحالة
     const originalTrainer = staff.find(s => s.id === r.trainerId);
     if (originalTrainer) recipientsToNotify.push(originalTrainer);
-
-    // 2. رؤساء الأقسام المعنيين بالتخصص
     const HODs = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
     recipientsToNotify.push(...HODs);
-    
-    // 3. المرشدين التدريبيين
     const counselors = staff.filter(s => s.isCounselor);
     recipientsToNotify.push(...counselors);
 
-    // 4. تصفية ومعالجة الإرسال السريع بالتوازي
     const uniqueRecipients = Array.from(new Set(recipientsToNotify.map(s => s.id)))
       .map(id => staff.find(s => s.id === id))
-      .filter((s): s is Staff => 
-        !!s && 
-        !!s.telegramChatId && 
-        s.id !== currentUser.id // منع إرسال إشعار للمستخدم الذي قام بالإجراء
-      );
+      .filter((s): s is Staff => !!s && !!s.telegramChatId && s.id !== currentUser.id);
 
     try {
       await Promise.all(uniqueRecipients.map(recipient => 
@@ -151,7 +154,6 @@ const App: React.FC = () => {
         return <NewReferral {...commonProps} trainees={trainees} 
           onSubmit={async (r) => { 
             await setDoc(doc(db, 'referrals', r.id), r); 
-            // تشغيل التنبيهات في الخلفية دون انتظارها لضمان سرعة الواجهة
             triggerNotifications(r).catch(e => console.error("Notification BG Error:", e));
             setEditingReferral(undefined);
             setActivePage('referrals'); 
@@ -168,7 +170,12 @@ const App: React.FC = () => {
           onDelete={async (id) => await deleteDoc(doc(db, 'referrals', id))} />;
       case 'staff': return <StaffManagement staff={staff} setStaff={() => {}} currentUserSpecialization={currentUser.specialization} />;
       case 'import': return <DataImport trainees={trainees} setTrainees={setTrainees} staff={staff} setStaff={() => {}} />;
-      case 'profile': return <Profile currentUser={currentUser} updateUserPassword={async (p) => await updateDoc(doc(db, 'staff', currentUser.id), {password: p})} onUpdateTelegram={async (id) => await updateDoc(doc(db, 'staff', currentUser.id), {telegramChatId: id})} />;
+      case 'profile': return <Profile currentUser={currentUser} 
+        updateUserPassword={async (p) => {
+          const hashed = await hashPassword(p);
+          await updateDoc(doc(db, 'staff', currentUser.id), { password: hashed });
+        }} 
+        onUpdateTelegram={async (id) => await updateDoc(doc(db, 'staff', currentUser.id), { telegramChatId: id })} />;
       default: return <Dashboard referrals={referrals} />;
     }
   };
