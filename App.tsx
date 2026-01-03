@@ -51,11 +51,14 @@ const App: React.FC = () => {
           for (const s of INITIAL_STAFF) { await setDoc(doc(db, 'staff', s.id), s); }
         } else {
           const staffData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Staff));
+          
+          // ترتيب: رؤساء الأقسام أولاً لتسهيل وصولهم
           staffData.sort((a, b) => {
             if (a.role === UserRole.HOD && b.role !== UserRole.HOD) return -1;
             if (a.role !== UserRole.HOD && b.role === UserRole.HOD) return 1;
             return a.name.localeCompare(b.name, 'ar');
           });
+          
           setStaff(staffData);
           setIsLoading(false);
         }
@@ -107,47 +110,31 @@ const App: React.FC = () => {
     }
   };
 
-  /**
-   * دالة إرسال الإشعارات المركزية - تستدعى يدوياً بعد نجاح كتابة قاعدة البيانات
-   */
   const triggerNotifications = async (r: Referral) => {
     if (!currentUser || !staff.length) return;
-    
     const lastEvent = r.timeline[r.timeline.length - 1];
     const htmlMessage = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
     
-    // إشعار محلي للمتصفح
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("تحديث في نظام الإحالة", { body: `${lastEvent.action}: ${r.traineeName}`, dir: 'rtl' });
-    }
-
-    // تصفية المستلمين الذين لديهم Telegram Chat ID ومفعلين للإشعارات
     let potentialRecipients: Staff[] = [];
-    
-    // 1. المدرب الأصلي دائماً يصله تحديث
     const trainer = staff.find(s => s.id === r.trainerId);
     if (trainer) potentialRecipients.push(trainer);
 
-    // 2. إذا كانت الحالة بانتظار HOD
     if (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) {
       const hods = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
       potentialRecipients.push(...hods);
     }
 
-    // 3. إذا كانت بانتظار المرشد
     if (r.status === ReferralStatus.PENDING_COUNSELOR) {
       const counselors = staff.filter(s => s.isCounselor);
       potentialRecipients.push(...counselors);
     }
 
-    // تنظيف القائمة من التكرار ومن الشخص الذي قام بالفعل الحالي
     const uniqueRecipients = potentialRecipients.filter((s, index, self) => 
       s.telegramChatId && 
       s.id !== currentUser.id && 
       self.findIndex(t => t.id === s.id) === index
     );
 
-    // الإرسال الفوري لجميع المستلمين المستهدفين
     uniqueRecipients.forEach(recipient => {
       sendTelegramNotification(recipient.telegramChatId!, htmlMessage);
     });
@@ -161,9 +148,7 @@ const App: React.FC = () => {
       case 'new-referral': 
         return <NewReferral {...commonProps} trainees={trainees} 
           onSubmit={async (r) => { 
-            // كتابة البيانات أولاً في قاعدة البيانات
             await setDoc(doc(db, 'referrals', r.id), r); 
-            // بمجرد نجاح الكتابة، نطلق الإشعارات
             triggerNotifications(r);
             setEditingReferral(undefined);
             setActivePage('referrals'); 
@@ -196,14 +181,13 @@ const App: React.FC = () => {
             <h1 className="text-3xl font-black">نظام الإحالة الرقمي</h1>
             <p className="text-sm font-bold opacity-60">الكلية التقنية بالطائف</p>
           </div>
-          
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-500 pr-1 uppercase">اختر هويتك</label>
+              <label className="text-xs font-black text-slate-500 pr-1 uppercase">اختر هويتك (رؤساء الأقسام أولاً)</label>
               <select 
                 value={loginUser} 
                 onChange={(e) => setLoginUser(e.target.value)} 
-                className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-blue-500 appearance-none transition-all"
+                className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-blue-500 appearance-none transition-all shadow-sm"
                 required
               >
                 <option value="">-- اختر من القائمة --</option>
@@ -216,7 +200,7 @@ const App: React.FC = () => {
                 type="password" 
                 value={loginPass} 
                 onChange={(e) => setLoginPass(e.target.value)} 
-                className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-mono text-center text-xl outline-none focus:border-blue-500 transition-all"
+                className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-mono text-center text-xl outline-none focus:border-blue-500 transition-all shadow-sm"
                 placeholder="••••"
                 required
               />
@@ -224,24 +208,31 @@ const App: React.FC = () => {
             {loginError && <p className="text-red-500 text-center text-xs font-bold animate-pulse">{loginError}</p>}
             <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl hover:bg-blue-700 active:scale-95 transition-all">دخول آمن</button>
           </form>
-          <div className="mt-8 text-center text-[10px] font-black opacity-30 uppercase tracking-widest">تطوير: م. عبدالله الزهراني</div>
+          <div className="mt-12 flex flex-col items-center gap-2">
+             <div className="flex items-center gap-2 text-slate-400 bg-slate-50 px-4 py-2 rounded-full border border-slate-200">
+                <Code2 size={14} />
+                <span className="text-[10px] font-black uppercase tracking-widest">تطوير: م. عبدالله الزهراني</span>
+             </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC] font-cairo">
+    <div className="flex min-h-screen bg-[#F8FAFC] font-cairo overflow-hidden">
       <Sidebar activePage={activePage} setActivePage={(p) => { if(p !== 'new-referral') setEditingReferral(undefined); setActivePage(p); }} currentUserRole={effectiveRole} onLogout={() => setIsAuthenticated(false)} notificationCount={pendingCount} />
       <main className="flex-1 p-4 md:p-10 overflow-y-auto pb-28">
         <header className="mb-10 flex justify-between items-center no-print">
-           <div>
-             <h1 className="text-2xl font-black text-slate-900 tracking-tight capitalize">{activePage.replace('-', ' ')}</h1>
-             <p className="text-slate-400 text-xs font-bold">{currentUser?.name}</p>
+           <div className="flex items-center gap-4">
+             <div>
+               <h1 className="text-2xl font-black text-slate-900 tracking-tight capitalize">{activePage.replace('-', ' ')}</h1>
+               <p className="text-slate-400 text-xs font-bold">{currentUser?.name}</p>
+             </div>
            </div>
            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100 text-slate-400 cursor-pointer" onClick={() => setActivePage('profile')}>
-                <User size={20} />
+              <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100 text-slate-600 hover:text-blue-600 cursor-pointer transition-all" onClick={() => setActivePage('profile')}>
+                <User size={22} />
               </div>
            </div>
         </header>
