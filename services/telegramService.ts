@@ -1,10 +1,16 @@
 /**
- * Telegram Notification Service (Professional POST Version)
- * Optimized for 100% compatibility with Telegram Bot API.
+ * Telegram Notification Service (Diagnostic Version)
  */
 
 const BOT_TOKEN = '8589128782:AAEvXaKJxFipipYhbX8TJ9u9rBzEN_FHr4o';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
+
+export interface TelegramResponse {
+  success: boolean;
+  message?: string;
+  errorCode?: number;
+  description?: string;
+}
 
 const escapeHTML = (text: string): string => {
   if (!text) return '';
@@ -15,49 +21,68 @@ const escapeHTML = (text: string): string => {
 };
 
 /**
- * Sends a message to Telegram using the POST method with JSON body.
+ * يتحقق من صحة التوكين وحالة البوت
  */
-export const sendTelegramNotification = async (chatId: string, message: string): Promise<boolean> => {
-  if (!chatId || !BOT_TOKEN) return false;
+export const checkBotStatus = async (): Promise<TelegramResponse> => {
+  try {
+    const response = await fetch(`${TELEGRAM_API_BASE}/getMe`);
+    const data = await response.json();
+    if (data.ok) {
+      return { success: true, message: `البوت جاهز: @${data.result.username}` };
+    }
+    return { success: false, errorCode: data.error_code, description: data.description };
+  } catch (e) {
+    return { success: false, description: 'فشل الوصول لخوادم تيليجرام (ربما مشكلة في الإنترنت)' };
+  }
+};
 
-  const endpoint = `${TELEGRAM_API_BASE}/sendMessage`;
+/**
+ * إرسال إشعار مع تحليل الأخطاء
+ */
+export const sendTelegramNotification = async (chatId: string, message: string): Promise<TelegramResponse> => {
+  if (!chatId) return { success: false, description: 'المعرف الرقمي (ID) ناقص' };
   
+  const endpoint = `${TELEGRAM_API_BASE}/sendMessage`;
   const payload = {
-    chat_id: chatId,
+    chat_id: chatId.trim(),
     text: message,
     parse_mode: 'HTML',
-    disable_web_page_preview: true,
-    disable_notification: false
+    disable_web_page_preview: true
   };
 
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-      mode: 'cors'
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
 
     const result = await response.json();
 
     if (result.ok) {
-      console.log(`✅ Telegram: Message delivered to ${chatId}`);
-      return true;
+      return { success: true };
     } else {
-      console.error(`❌ Telegram API Error: ${result.description}`);
-      return false;
+      // تحليل الخطأ الصادر من تيليجرام
+      let userFriendlyMsg = result.description;
+      if (result.error_code === 403) userFriendlyMsg = 'المستخدم قام بحظر البوت أو لم يفعله بعد (أرسل /start للبوت أولاً)';
+      if (result.error_code === 400) userFriendlyMsg = 'المعرف الرقمي (Chat ID) غير صحيح أو لم يسبق له التفاعل مع البوت';
+      
+      return { 
+        success: false, 
+        errorCode: result.error_code, 
+        description: result.description,
+        message: userFriendlyMsg
+      };
     }
   } catch (e) {
-    console.error('❌ Network Error: Connection to Telegram failed.', e);
-    return false;
+    console.error('Network Error:', e);
+    return { 
+      success: false, 
+      description: 'تعذر الاتصال بخادم تيليجرام من متصفحك. قد يكون السبب حماية الشبكة (CORS) أو انقطاع الإنترنت.' 
+    };
   }
 };
 
-/**
- * Enhanced formatter for Telegram messages.
- */
 export const formatReferralMessage = (
   action: string,
   traineeName: string,
