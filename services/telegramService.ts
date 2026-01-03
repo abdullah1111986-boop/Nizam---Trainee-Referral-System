@@ -1,5 +1,5 @@
 /**
- * Telegram Notification Service
+ * Telegram Notification Service (Browser-Optimized)
  */
 
 const BOT_TOKEN = '8589128782:AAEvXaKJxFipipYhbX8TJ9u9rBzEN_FHr4o';
@@ -15,48 +15,44 @@ const escapeHTML = (text: string): string => {
     .replace(/>/g, '&gt;');
 };
 
+/**
+ * Sends notification via GET request which is more browser-friendly for cross-origin requests
+ */
 export const sendTelegramNotification = async (chatId: string, message: string) => {
-  if (!chatId || !BOT_TOKEN || BOT_TOKEN.includes('REPLACE')) return;
+  if (!chatId || !BOT_TOKEN) {
+    console.warn('Telegram Notification: Chat ID or Token missing.');
+    return;
+  }
 
-  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-
-  const sendRequest = async (useHtml: boolean) => {
-    return fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: useHtml ? 'HTML' : undefined,
-      }),
-    });
-  };
+  // استخدام GET بدلاً من POST لتجنب مشاكل CORS المعقدة في المتصفحات
+  // نقوم بتشفير الرسالة بشكل كامل للتأكد من وصولها للمتصفح
+  const encodedMessage = encodeURIComponent(message);
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodedMessage}&parse_mode=HTML`;
 
   try {
-    let response = await sendRequest(true);
+    console.debug(`Attempting to send Telegram notification to Chat ID: ${chatId} from browser...`);
+    
+    // استخدام mode: 'no-cors' قد يكون ضرورياً في بعض المتصفحات إذا كان التيليجرام لا يسمح بـ Origin معين
+    // لكننا سنبدأ بالوضع العادي لنتمكن من قراءة الرد
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
 
-    // If HTML parsing fails (often due to unmatched tags or entities), fallback to plain text
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.warn('Telegram HTML send failed, trying plain text fallback...', errorData);
-      
-      // Strip HTML tags for plain text delivery as a last resort
-      const plainMessage = message.replace(/<[^>]*>/g, ''); 
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: plainMessage,
-        }),
-      });
-    }
+    const result = await response.json();
 
-    if (!response.ok) {
-      console.error('Telegram notification completely failed:', await response.text());
+    if (response.ok) {
+      console.log('✅ Telegram notification sent successfully from browser.');
+      return result;
+    } else {
+      console.error('❌ Telegram API error:', result);
+      throw new Error(result.description || 'فشل في إرسال الإشعار');
     }
   } catch (error) {
-    console.error('Network error during Telegram notification send:', error);
+    console.error('❌ Browser-side Telegram delivery failed:', error);
+    throw error;
   }
 };
 
@@ -67,22 +63,22 @@ export const formatReferralMessage = (
   actorName: string,
   comment?: string
 ) => {
-  // Use escaped versions for user-generated content to prevent HTML injection/errors
   const safeAction = escapeHTML(action);
   const safeTrainee = escapeHTML(traineeName);
   const safeStatus = escapeHTML(status);
   const safeActor = escapeHTML(actorName);
   const safeComment = comment ? escapeHTML(comment) : '';
 
+  // تنسيق الرسالة بشكل مبسط لضمان التوافق مع المتصفحات
   return `
-🔔 <b>تحديث جديد في نظام الإحالة</b>
+🔔 <b>تحديث في نظام الإحالة</b>
 
 👤 <b>الإجراء:</b> ${safeAction}
 👨‍🎓 <b>المتدرب:</b> ${safeTrainee}
-🔄 <b>الحالة الحالية:</b> ${safeStatus}
+🔄 <b>الحالة:</b> ${safeStatus}
 ✍️ <b>بواسطة:</b> ${safeActor}
-${safeComment ? `\n📝 <b>ملاحظات:</b>\n${safeComment}` : ''}
+${safeComment ? `\n📝 <b>ملاحظات:</b> ${safeComment}` : ''}
 
-📅 <i>تم الإرسال تلقائياً من نظام إحالة المتدربين</i>
+🌐 <i>مرسل من متصفح المستخدم</i>
   `.trim();
 };

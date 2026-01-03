@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Staff } from '../types';
-import { Lock, Save, Send, Loader2, CheckCircle, AlertCircle, BellRing, Smartphone, MessageSquareText } from 'lucide-react';
+import { Lock, Save, Send, Loader2, CheckCircle, AlertCircle, BellRing, Smartphone, MessageSquareText, Info, ExternalLink } from 'lucide-react';
 import { sendTelegramNotification } from '../services/telegramService';
 
 interface ProfileProps {
@@ -40,17 +40,6 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
     }
   };
 
-  const testBrowserNotification = () => {
-    if (Notification.permission === 'granted') {
-      new Notification("اختبار النظام", { 
-        body: "هذا مثال لشكل الإشعار عند وصول إحالة جديدة.",
-        icon: 'https://cdn-icons-png.flaticon.com/512/3119/3119338.png'
-      });
-    } else {
-      alert("يرجى تفعيل الصلاحية أولاً.");
-    }
-  };
-
   const handleTestTelegram = async () => {
     if (!telegramChatId) {
       setTeleFeedback({ type: 'error', msg: 'يرجى إدخال المعرف أولاً' });
@@ -59,39 +48,13 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
     setIsTestingTelegram(true);
     setTeleFeedback(null);
     try {
-      const testMsg = `🧪 <b>اختبار نظام الإحالة</b>\n\n✅ تم ربط حسابك (<b>${currentUser.name}</b>) بنجاح.\nستصلك التنبيهات هنا فور حدوث أي إجراء.`;
+      const testMsg = `✅ تم ربط حسابك بنجاح في نظام الإحالة.\n👤 المستخدم: ${currentUser.name}`;
       await sendTelegramNotification(telegramChatId, testMsg);
-      setTeleFeedback({ type: 'success', msg: 'تم إرسال رسالة اختبار لهاتفك' });
-    } catch (error) {
-      setTeleFeedback({ type: 'error', msg: 'فشل الإرسال. تأكد من المعرف وبدء المحادثة مع البوت.' });
+      setTeleFeedback({ type: 'success', msg: 'وصلت الرسالة! الربط يعمل بنجاح.' });
+    } catch (error: any) {
+      setTeleFeedback({ type: 'error', msg: `فشل الإرسال: ${error.message || 'تأكد من الخطوات أدناه'}` });
     } finally {
       setIsTestingTelegram(false);
-    }
-  };
-
-  const handleSubmitPass = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPassFeedback(null);
-    if (newPassword.length < 4) {
-      setPassFeedback({ type: 'error', msg: 'كلمة المرور يجب أن تكون 4 خانات على الأقل' });
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPassFeedback({ type: 'error', msg: 'كلمتا المرور غير متطابقتين' });
-      return;
-    }
-    const confirmed = window.confirm('هل أنت متأكد من تغيير كلمة المرور؟');
-    if (!confirmed) return;
-    setIsSavingPass(true);
-    try {
-      await updateUserPassword(newPassword);
-      setPassFeedback({ type: 'success', msg: 'تم تغيير كلمة المرور بنجاح' });
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (error) {
-      setPassFeedback({ type: 'error', msg: 'حدث خطأ أثناء التحديث' });
-    } finally {
-      setIsSavingPass(false);
     }
   };
 
@@ -100,45 +63,31 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
     setIsSavingTelegram(true);
     try {
       await onUpdateTelegram(telegramChatId);
-      setTeleFeedback({ type: 'success', msg: 'تم تحديث البيانات بنجاح' });
+      setTeleFeedback({ type: 'success', msg: 'تم حفظ المعرف في ملفك الشخصي' });
     } catch (error) {
-      setTeleFeedback({ type: 'error', msg: 'حدث خطأ أثناء الحفظ' });
+      setTeleFeedback({ type: 'error', msg: 'حدث خطأ أثناء حفظ البيانات' });
     } finally {
       setIsSavingTelegram(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 space-y-6 pb-20 px-4">
-      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-        <div className="text-center mb-6">
-          <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-inner ${browserNotificationStatus === 'granted' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-            <BellRing size={32} />
-          </div>
-          <h2 className="text-xl font-black text-slate-900">إشعارات المتصفح</h2>
-          <p className="text-sm text-slate-400 font-bold mt-1">تنبيهات فورية على الجوال والكومبيوتر</p>
+    <div className="max-w-md mx-auto mt-10 space-y-6 pb-24 px-4">
+      {/* قسم إرشادات التيليجرام - مهم جداً للحل */}
+      <div className="bg-blue-600 text-white p-6 rounded-[2rem] shadow-xl shadow-blue-200 relative overflow-hidden">
+        <div className="relative z-10">
+          <h3 className="flex items-center gap-2 font-black text-lg mb-4">
+            <Info size={20} /> خطوات تفعيل التنبيهات
+          </h3>
+          <ol className="space-y-3 text-sm font-bold opacity-90 list-decimal pr-4">
+            <li>ابحث عن البوت في تيليجرام: <span className="bg-white/20 px-2 py-0.5 rounded select-all">ReferralSystemBot</span></li>
+            <li>اضغط على زر <b>Start</b> لتفعيل البوت.</li>
+            <li>للحصول على الـ ID الخاص بك، ارسل رسالة إلى بوت <a href="https://t.me/userinfobot" target="_blank" className="underline inline-flex items-center gap-1">@userinfobot <ExternalLink size={12}/></a></li>
+            <li>انسخ الرقم الظاهر وضعه في الخانة أدناه.</li>
+          </ol>
         </div>
-        <div className="space-y-4">
-           {browserNotificationStatus === 'granted' ? (
-             <div className="p-4 bg-green-50 border border-green-100 rounded-2xl flex items-center gap-3">
-               <CheckCircle className="text-green-500" size={20} />
-               <span className="text-xs font-black text-green-800">الإشعارات مفعلة على هذا الجهاز</span>
-             </div>
-           ) : browserNotificationStatus === 'denied' ? (
-             <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3">
-               <AlertCircle className="text-red-500" size={20} />
-               <span className="text-xs font-black text-red-800">الإشعارات محظورة. يرجى تفعيلها من إعدادات المتصفح.</span>
-             </div>
-           ) : (
-             <button onClick={requestBrowserPermission} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2">
-                <Smartphone size={18} /> تفعيل الإشعارات الآن
-             </button>
-           )}
-           {browserNotificationStatus === 'granted' && (
-             <button onClick={testBrowserNotification} className="w-full py-3 border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-xs hover:bg-slate-50 transition-all">
-               إرسال إشعار تجريبي للجهاز
-             </button>
-           )}
+        <div className="absolute -bottom-4 -left-4 opacity-10 rotate-12">
+           <Send size={120} />
         </div>
       </div>
 
@@ -151,16 +100,14 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
         </div>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-black text-slate-500 pr-1 uppercase tracking-wider">Telegram Chat ID</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={telegramChatId}
-                onChange={(e) => setTelegramChatId(e.target.value)}
-                className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-500 focus:bg-white outline-none transition-all font-mono text-center text-lg font-bold"
-                placeholder="12345678"
-              />
-            </div>
+            <label className="block text-[10px] font-black text-slate-400 pr-1 uppercase tracking-widest">Chat ID (رقمي فقط)</label>
+            <input
+              type="text"
+              value={telegramChatId}
+              onChange={(e) => setTelegramChatId(e.target.value.replace(/\D/g, ''))}
+              className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-500 focus:bg-white outline-none transition-all font-mono text-center text-xl font-bold"
+              placeholder="مثال: 58210339"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <button
@@ -174,7 +121,7 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
             <button
               onClick={handleTestTelegram}
               disabled={isTestingTelegram || !telegramChatId}
-              className={`py-4 rounded-2xl transition-all font-black flex items-center justify-center gap-2 border-2 ${isTestingTelegram ? 'bg-slate-50 text-slate-300' : 'border-slate-100 text-slate-600 hover:bg-slate-50'}`}
+              className={`py-4 rounded-2xl transition-all font-black flex items-center justify-center gap-2 border-2 ${isTestingTelegram ? 'bg-slate-50 text-slate-300' : 'border-slate-100 text-slate-600 hover:bg-slate-50 active:scale-95'}`}
             >
               {isTestingTelegram ? <Loader2 className="animate-spin" size={18} /> : <MessageSquareText size={18} />}
               اختبار
@@ -190,32 +137,24 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
       </div>
 
       <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-900">
-            <Lock size={20}/>
+        <div className="text-center mb-6">
+          <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-inner ${browserNotificationStatus === 'granted' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+            <BellRing size={32} />
           </div>
-          <h3 className="text-lg font-black text-slate-900">أمان الحساب</h3>
+          <h2 className="text-xl font-black text-slate-900">إشعارات المتصفح</h2>
         </div>
-        <form onSubmit={handleSubmitPass} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-black text-slate-500 pr-1 uppercase">كلمة المرور الجديدة</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-slate-900 focus:bg-white outline-none transition-all font-mono tracking-widest text-center" placeholder="••••" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="block text-xs font-black text-slate-500 pr-1 uppercase">تأكيد كلمة المرور</label>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-slate-900 focus:bg-white outline-none transition-all font-mono tracking-widest text-center" placeholder="••••" />
-          </div>
-          <button type="submit" disabled={isSavingPass} className={`w-full py-4 rounded-2xl transition-all font-black flex items-center justify-center gap-2 shadow-xl ${isSavingPass ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white hover:bg-black'}`}>
-            {isSavingPass ? <Loader2 className="animate-spin" size={20} /> : <Save size={18} />}
-            تحديث البيانات
-          </button>
-          {passFeedback && (
-            <div className={`flex items-center gap-2 p-3 rounded-xl text-xs font-bold ${passFeedback.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-              {passFeedback.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-              {passFeedback.msg}
-            </div>
-          )}
-        </form>
+        <div className="space-y-4">
+           {browserNotificationStatus === 'granted' ? (
+             <div className="p-4 bg-green-50 border border-green-100 rounded-2xl flex items-center gap-3">
+               <CheckCircle className="text-green-500" size={20} />
+               <span className="text-xs font-black text-green-800">الإشعارات مفعلة على هذا الجهاز</span>
+             </div>
+           ) : (
+             <button onClick={requestBrowserPermission} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black shadow-lg hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-2">
+                <Smartphone size={18} /> تفعيل تنبيهات الجهاز
+             </button>
+           )}
+        </div>
       </div>
     </div>
   );

@@ -24,7 +24,6 @@ export const hashPassword = async (password: string): Promise<string> => {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// بصمة مشفرة لكلمة المرور الافتراضية "123"
 const INITIAL_HASH = "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
 
 const INITIAL_STAFF: Staff[] = [
@@ -46,7 +45,6 @@ const App: React.FC = () => {
   const [trainees, setTrainees] = useState<Trainee[]>([]);
   const [editingReferral, setEditingReferral] = useState<Referral | undefined>(undefined);
 
-  // طلب صلاحية الإشعارات عند التشغيل
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
@@ -141,14 +139,16 @@ const App: React.FC = () => {
     setLoginError('بيانات الدخول غير صحيحة');
   };
 
+  /**
+   * دالة إرسال الإشعارات - تعمل بالكامل من متصفح المستخدم
+   */
   const triggerNotifications = async (r: Referral) => {
     if (!currentUser || !staff.length) return;
     
-    // إرسال الإشعارات في جميع الحالات المهمة
     const lastEvent = r.timeline[r.timeline.length - 1];
     const msg = formatReferralMessage(lastEvent.action, r.traineeName, r.status, currentUser.name, lastEvent.comment);
     
-    // إشعار المتصفح
+    // إشعار المتصفح المحلي (Native Notification)
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("تنبيه نظام الإحالة", {
         body: `${lastEvent.action}: للمتدرب ${r.traineeName}`,
@@ -159,34 +159,33 @@ const App: React.FC = () => {
 
     // تحديد المستقبلين للتيليجرام
     let recipientsToNotify: Staff[] = [];
-    
-    // 1. دائماً نبلغ المدرب الأصلي الذي رفع الحالة بأي تحديث
     const originalTrainer = staff.find(s => s.id === r.trainerId);
     if (originalTrainer) recipientsToNotify.push(originalTrainer);
     
-    // 2. إذا كانت الحالة بانتظار رئيس القسم، نبلغ رؤساء الأقسام في نفس التخصص
     if (r.status === ReferralStatus.PENDING_HOD || r.status === ReferralStatus.RETURNED_TO_HOD) {
       const HODs = staff.filter(s => s.role === UserRole.HOD && s.specialization === r.specialization);
       recipientsToNotify.push(...HODs);
     }
     
-    // 3. إذا كانت محالة للمرشد، نبلغ جميع المرشدين
     if (r.status === ReferralStatus.PENDING_COUNSELOR) {
       const counselors = staff.filter(s => s.isCounselor);
       recipientsToNotify.push(...counselors);
     }
 
-    // فلترة المكرر والتأكد من وجود Chat ID وعدم إرسال إشعار للشخص الذي قام بالفعل نفسه
     const uniqueRecipients = Array.from(new Set(recipientsToNotify.map(s => s.id)))
       .map(id => staff.find(s => s.id === id))
       .filter((s): s is Staff => !!s && !!s.telegramChatId && s.id !== currentUser.id);
 
-    try {
-      await Promise.all(uniqueRecipients.map(recipient => 
-        sendTelegramNotification(recipient.telegramChatId!, msg)
-      ));
-    } catch (error) {
-      console.error('Fast Notification Error:', error);
+    // المتصفح يقوم بإرسال الطلبات الآن فرداً فرداً
+    console.log(`Browser starting Telegram broadcast to ${uniqueRecipients.length} recipients...`);
+    
+    // نستخدم التوالي بدلاً من التوازي لضمان عدم حظر المتصفح للطلبات المتعددة
+    for (const recipient of uniqueRecipients) {
+      try {
+        await sendTelegramNotification(recipient.telegramChatId!, msg);
+      } catch (err) {
+        console.warn(`Failed to notify ${recipient.name} from browser:`, err);
+      }
     }
   };
 
@@ -198,8 +197,10 @@ const App: React.FC = () => {
       case 'new-referral': 
         return <NewReferral {...commonProps} trainees={trainees} 
           onSubmit={async (r) => { 
+            // 1. حفظ في الداتا بيس
             await setDoc(doc(db, 'referrals', r.id), r); 
-            triggerNotifications(r).catch(e => console.error("Notification BG Error:", e));
+            // 2. المتصفح يرسل الإشعارات فوراً (مسؤولية العميل)
+            triggerNotifications(r);
             setEditingReferral(undefined);
             setActivePage('referrals'); 
           }} 
