@@ -73,7 +73,7 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
               <div className="mb-4 text-blue-600"><MessageCircle size={32} /></div>
               <h4 className="font-black text-slate-800 mb-2">تفعيل البوت</h4>
               <p className="text-xs font-bold text-slate-500 leading-relaxed mb-4">يجب الدخول للبوت والضغط على <b>Start</b> لفتح قناة التواصل.</p>
-              <a href="https://t.me/ReferralSystemBot" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-600 font-black text-[10px] bg-blue-50 px-3 py-2 rounded-xl w-fit hover:bg-blue-100 transition-colors">
+              <a href="https://t.me/Transferred_trainers_bot" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-600 font-black text-[10px] bg-blue-50 px-3 py-2 rounded-xl w-fit hover:bg-blue-100 transition-colors">
                 فتح البوت الرسمي <ExternalLink size={12} />
               </a>
             </div>
@@ -161,7 +161,7 @@ const Profile: React.FC<ProfileProps> = ({ currentUser, updateUserPassword, onUp
              <div className="space-y-4">
                 <div>
                    <p className="text-[10px] font-black text-amber-900 mb-1">لماذا لا تصلني التنبيهات؟</p>
-                   <p className="text-[10px] font-bold text-amber-700 opacity-80 leading-relaxed">تأكد من إرسال /start للبوت @ReferralSystemBot أولاً، ومن صحة رقم الـ ID.</p>
+                   <p className="text-[10px] font-bold text-amber-700 opacity-80 leading-relaxed">تأكد من إرسال /start للبوت @Transferred_trainers_bot أولاً، ومن صحة رقم الـ ID.</p>
                 </div>
                 <div>
                    <p className="text-[10px] font-black text-amber-900 mb-1">هل الإشعارات فورية؟</p>
