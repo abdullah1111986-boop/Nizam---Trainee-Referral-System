@@ -25,7 +25,7 @@ const INITIAL_HASH = "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7
 
 const INITIAL_STAFF: Staff[] = [
   { id: 'hod1', name: 'م. عبدالله الزهراني', username: 'م. عبدالله Zahrani', password: '0555588157', role: UserRole.HOD, specialization: 'محركات ومركبات' },
-  { id: 'hod2', name: 'م. ياسر الشربي', username: 'م. ياسر الشربي', password: INITIAL_HASH, role: UserRole.HOD, specialization: 'تصنيع' },
+  { id: 'hod2', name: 'م. ياسر الشربي', username: 'م. ياسر الشربي', password: '123456', role: UserRole.HOD, specialization: 'تصنيع' },
   { id: 'counselor1', name: 'ماجد ابراهيم المرزوقي', username: 'ماجد ابراهيم المرزوقي', password: INITIAL_HASH, role: UserRole.TRAINER, specialization: 'توجيه وإرشاد', isCounselor: true },
 ];
 
@@ -43,21 +43,30 @@ const App: React.FC = () => {
   const [editingReferral, setEditingReferral] = useState<Referral | undefined>(undefined);
 
   useEffect(() => {
-    // تحديث كلمة مرور م. عبدالله الزهراني إذا كانت تختلف عن القيمة المطلوبة
-    const updateAbdullahPassword = async () => {
+    // تحديث كلمات المرور للمستخدمين إذا كانت تختلف عن القيم المطلوبة
+    const updatePasswords = async () => {
       try {
-        const targetUser = staff.find(s => s.id === 'hod1');
-        const newPass = '0555588157';
-        const newHash = await hashPassword(newPass);
-        if (targetUser && targetUser.password !== newHash && targetUser.password !== newPass) {
-          await updateDoc(doc(db, 'staff', 'hod1'), { password: newHash });
+        // تحديث م. عبدالله الزهراني
+        const abdullah = staff.find(s => s.id === 'hod1');
+        const abdullahPass = '0555588157';
+        const abdullahHash = await hashPassword(abdullahPass);
+        if (abdullah && abdullah.password !== abdullahHash && abdullah.password !== abdullahPass) {
+          await updateDoc(doc(db, 'staff', 'hod1'), { password: abdullahHash });
+        }
+
+        // تحديث م. ياسر الشربي
+        const yasser = staff.find(s => s.id === 'hod2');
+        const yasserPass = '123456';
+        const yasserHash = await hashPassword(yasserPass);
+        if (yasser && yasser.password !== yasserHash && yasser.password !== yasserPass) {
+          await updateDoc(doc(db, 'staff', 'hod2'), { password: yasserHash });
         }
       } catch (e) {
-        console.error('Error updating password:', e);
+        console.error('Error updating passwords:', e);
       }
     };
     if (staff.length > 0) {
-      updateAbdullahPassword();
+      updatePasswords();
     }
   }, [staff]);
 
