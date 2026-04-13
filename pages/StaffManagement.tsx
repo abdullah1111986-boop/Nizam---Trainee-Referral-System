@@ -54,7 +54,6 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ staff, currentUserSpe
   };
 
   const displayedStaff = staff.filter(s => 
-    s.role === UserRole.TRAINER && 
     (s.name.includes(searchTerm) || s.username.includes(searchTerm))
   );
 
@@ -87,7 +86,8 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ staff, currentUserSpe
               <table className="w-full text-right text-sm">
                 <thead className="bg-slate-50 text-slate-400">
                   <tr>
-                    <th className="p-4 font-black uppercase text-[10px] tracking-widest">المدرب</th>
+                    <th className="p-4 font-black uppercase text-[10px] tracking-widest">الاسم</th>
+                    <th className="p-4 font-black uppercase text-[10px] tracking-widest">الدور / التخصص</th>
                     <th className="p-4 font-black uppercase text-[10px] tracking-widest">إشعارات التلجرام</th>
                     <th className="p-4 font-black uppercase text-[10px] tracking-widest">المستوى الصلاحي</th>
                     <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center">التحكم</th>
@@ -96,7 +96,14 @@ const StaffManagement: React.FC<StaffManagementProps> = ({ staff, currentUserSpe
                 <tbody className="divide-y divide-slate-50">
                   {displayedStaff.map((s) => (
                     <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 font-bold text-slate-800">{s.name}</td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800">{s.name}</div>
+                        <div className="text-[10px] text-slate-400">{s.username}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-600 text-xs">{s.role}</div>
+                        <div className="text-[10px] text-slate-400">{s.specialization}</div>
+                      </td>
                       <td className="p-4">
                         {s.telegramChatId ? 
                           <span className="inline-flex items-center text-green-600 gap-1 bg-green-50 px-2 py-1 rounded-lg text-[10px] font-black"><Send size={10}/> مفعلة</span> : 
